@@ -3,3 +3,5 @@ node_modules/
 projects/*
 !projects/demo/
 *.log
+AGENTS.md
+package-lock.json
