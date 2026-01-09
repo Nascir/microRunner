@@ -1,0 +1,815 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>microRunner</title>
+        <link rel="stylesheet" href="/css/style.css" />
+        <link
+            rel="stylesheet"
+            href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+        />
+    </head>
+    <body>
+        <div class="container">
+            <h1>micro<span class="accent">Runner</span></h1>
+            <div class="powered-by">
+                <span>Powered by</span>
+                <a
+                    href="https://github.com/pmgl/microstudio"
+                    target="_blank"
+                    title="microStudio on GitHub"
+                >
+                    <i class="fab fa-github"></i> microStudio
+                </a>
+            </div>
+            <p class="subtitle">Local microScript development environment</p>
+
+            <div class="section-header">
+                <div class="section-title">Your Projects</div>
+                <div class="header-actions">
+                    <label class="btn btn-icon" title="Import from microStudio">
+                        <i class="fa fa-download"></i>
+                        <input
+                            type="file"
+                            id="import-project-input"
+                            accept=".zip"
+                            onchange="importProject(this)"
+                            style="display: none"
+                        />
+                    </label>
+                    <button class="btn btn-primary" onclick="openCreateModal()">
+                        <i class="fa fa-plus"></i> Create Project
+                    </button>
+                </div>
+            </div>
+            <div id="projects-container" class="projects-grid">
+                <div class="empty-state">Loading projects...</div>
+            </div>
+
+            <div class="help-section">
+                <h2>Getting Started</h2>
+                <ol>
+                    <li>
+                        Create a new project or click on one above to run it in
+                        the browser
+                    </li>
+                    <li>Open your IDE: <code>/projects/{project}/ms/</code></li>
+                    <li>Edit <code>*.ms</code> files and see changes live!</li>
+                </ol>
+            </div>
+
+            <footer class="footer">
+                <a href="https://github.com/Nascir/microRunner" target="_blank" title="microRunner on GitHub">
+                    <i class="fab fa-github"></i> microRunner
+                </a>
+            </footer>
+        </div>
+
+        <div id="config-modal" class="modal-overlay">
+            <div class="modal">
+                <div class="modal-header">
+                    <h2>Configure Project</h2>
+                    <i
+                        class="fa fa-times close-icon"
+                        onclick="closeConfigModal()"
+                    ></i>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="config-name">Name</label>
+                        <input
+                            type="text"
+                            id="config-name"
+                            placeholder="Project name"
+                        />
+                    </div>
+                    <div class="form-group">
+                        <label for="config-slug">Folder name</label>
+                        <input
+                            type="text"
+                            id="config-slug"
+                            placeholder="project-folder"
+                        />
+                        <div id="slug-warning" class="warning-text">
+                            <i class="fa fa-exclamation-triangle"></i>
+                            Changing the folder name will rename the project
+                            folder and break active sessions. Server restart
+                            required for changes to take effect.
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="config-orientation">Orientation</label>
+                        <select id="config-orientation">
+                            <option value="any">ANY - Any orientation</option>
+                            <option value="portrait">
+                                PORTRAIT - Taller than wide
+                            </option>
+                            <option value="landscape">
+                                LANDSCAPE - Wider than tall
+                            </option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="config-aspect">Aspect Ratio</label>
+                        <select id="config-aspect">
+                            <option value="free">FREE - No constraint</option>
+                            <option value="1x1">1X1 - Square (1:1)</option>
+                            <option value="4x3">4X3 - Classic TV (4:3)</option>
+                            <option value="16x9">
+                                16X9 - Widescreen (16:9)
+                            </option>
+                            <option value="2x1">2X1 - Ultrawide (2:1)</option>
+                            <option value=">1x1">&gt;1X1 - Minimum 1:1</option>
+                            <option value=">4x3">&gt;4X3 - Minimum 4:3</option>
+                            <option value=">16x9">
+                                &gt;16X9 - Minimum 16:9
+                            </option>
+                            <option value=">2x1">&gt;2X1 - Minimum 2:1</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="config-sprite-direction">Sprite Sheet Direction</label>
+                        <select id="config-sprite-direction">
+                            <option value="vertical">VERTICAL - Frames top to bottom</option>
+                            <option value="horizontal">HORIZONTAL - Frames left to right</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button
+                        class="btn btn-secondary"
+                        onclick="closeConfigModal()"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        class="btn btn-primary"
+                        id="save-btn"
+                        onclick="saveConfig()"
+                    >
+                        Save
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div id="backup-modal" class="modal-overlay">
+            <div class="modal modal-wide">
+                <div class="modal-header">
+                    <h2>Project Backups</h2>
+                    <i
+                        class="fa fa-times close-icon"
+                        onclick="closeBackupModal()"
+                    ></i>
+                </div>
+                <div class="modal-body">
+                    <div class="backup-actions">
+                        <button
+                            class="btn btn-primary"
+                            id="create-backup-btn"
+                            onclick="createBackup()"
+                        >
+                            <i class="fa fa-download"></i> Create New Backup
+                        </button>
+                        <div class="backup-actions-right">
+                            <label class="btn btn-secondary upload-btn" title="Load backup from disk">
+                                <i class="fa fa-share"></i> Load from Disk
+                                <input
+                                    type="file"
+                                    accept=".zip"
+                                    onchange="uploadBackupFromDisk(this)"
+                                    style="display: none"
+                                />
+                            </label>
+                        </div>
+                    </div>
+                    <div id="backup-list" class="backup-list"></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="delete-modal" class="modal-overlay">
+            <div class="modal">
+                <div class="modal-header">
+                    <h2>Delete Project</h2>
+                    <i
+                        class="fa fa-times close-icon"
+                        onclick="closeDeleteModal()"
+                    ></i>
+                </div>
+                <div class="modal-body">
+                    <p>
+                        Are you sure you want to delete "<span
+                            id="delete-project-name"
+                        ></span
+                        >"?
+                    </p>
+                    <p class="warning-text">
+                        <i class="fa fa-exclamation-triangle"></i> This action
+                        cannot be undone. All files will be permanently removed.
+                    </p>
+                </div>
+                <div class="modal-footer">
+                    <button
+                        class="btn btn-secondary"
+                        onclick="closeDeleteModal()"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        class="btn btn-danger"
+                        id="delete-btn"
+                        onclick="deleteProject()"
+                    >
+                        Delete
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div id="create-modal" class="modal-overlay">
+            <div class="modal">
+                <div class="modal-header">
+                    <h2>Create New Project</h2>
+                    <i
+                        class="fa fa-times close-icon"
+                        onclick="closeCreateModal()"
+                    ></i>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="create-name">Name</label>
+                        <input
+                            type="text"
+                            id="create-name"
+                            placeholder="My Awesome Game"
+                        />
+                    </div>
+                    <div class="form-group">
+                        <label for="create-slug">Folder name</label>
+                        <input
+                            type="text"
+                            id="create-slug"
+                            placeholder="my-awesome-game"
+                        />
+                    </div>
+                    <div class="form-group">
+                        <label for="create-orientation">Orientation</label>
+                        <select id="create-orientation">
+                            <option value="any">ANY - Any orientation</option>
+                            <option value="portrait">
+                                PORTRAIT - Taller than wide
+                            </option>
+                            <option value="landscape">
+                                LANDSCAPE - Wider than tall
+                            </option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="create-aspect">Aspect Ratio</label>
+                        <select id="create-aspect">
+                            <option value="free">FREE - No constraint</option>
+                            <option value="1x1">1X1 - Square (1:1)</option>
+                            <option value="4x3">4X3 - Classic TV (4:3)</option>
+                            <option value="16x9">
+                                16X9 - Widescreen (16:9)
+                            </option>
+                            <option value="2x1">2X1 - Ultrawide (2:1)</option>
+                            <option value=">1x1">&gt;1X1 - Minimum 1:1</option>
+                            <option value=">4x3">&gt;4X3 - Minimum 4:3</option>
+                            <option value=">16x9">
+                                &gt;16X9 - Minimum 16:9
+                            </option>
+                            <option value=">2x1">&gt;2X1 - Minimum 2:1</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="create-sprite-direction">Sprite Sheet Direction</label>
+                        <select id="create-sprite-direction">
+                            <option value="vertical">VERTICAL - Frames top to bottom</option>
+                            <option value="horizontal">HORIZONTAL - Frames left to right</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button
+                        class="btn btn-secondary"
+                        onclick="closeCreateModal()"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        class="btn btn-primary"
+                        id="create-btn"
+                        onclick="createProject()"
+                    >
+                        Create
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <script src="/js/backup.js"></script>
+        <script>
+            async function importProject(input) {
+                const file = input.files[0];
+                if (!file) return;
+
+                if (!file.name.endsWith('.zip')) {
+                    showModal('Import Error', 'Please select a ZIP file', 'error');
+                    input.value = '';
+                    return;
+                }
+
+                const btn = input.parentElement;
+                btn.disabled = true;
+                btn.dataset.originalTitle = btn.title;
+                btn.title = 'Importing...';
+
+                try {
+                    const formData = new FormData();
+                    formData.append('file', file);
+
+                    const res = await fetch('/api/import-project', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    const result = await res.json();
+
+                    if (result.success) {
+                        input.value = '';
+                        loadProjects();
+                        const msg = `Project "${result.name}" imported successfully!`;
+                        if (result.warning) {
+                            showModal('Import Successful', msg, 'warning', result.warning);
+                        } else {
+                            showModal('Import Successful', msg, 'success');
+                        }
+                    } else {
+                        showModal('Import Failed', result.error || 'Unknown error', 'error');
+                    }
+                } catch (e) {
+                    showModal('Import Failed', e.message, 'error');
+                } finally {
+                    btn.disabled = false;
+                    btn.title = btn.dataset.originalTitle || 'Import from microStudio';
+                }
+            }
+
+            function showModal(title, message, type, warningHtml = null) {
+                const overlay = document.createElement('div');
+                overlay.className = 'dialog-overlay';
+                const iconClass = type === 'success' ? 'fa-check-circle' : (type === 'warning' ? 'fa-exclamation-triangle' : 'fa-exclamation-circle');
+                overlay.innerHTML = `
+                    <div class="dialog">
+                        <div class="dialog-header">
+                            <h3><i class="fa ${iconClass}"></i> ${escapeHtml(title)}</h3>
+                        </div>
+                        <div class="dialog-body">
+                            <p>${escapeHtml(message).replace(/\n/g, '<br>')}</p>
+                            ${warningHtml ? `<br><p style="color: #ff6b6b;">${warningHtml}</p>` : ''}
+                        </div>
+                        <div class="dialog-footer">
+                            <button class="btn btn-primary" id="dialog-ok">OK</button>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(overlay);
+
+                document.getElementById('dialog-ok').onclick = () => overlay.remove();
+                overlay.onclick = (e) => {
+                    if (e.target === overlay) overlay.remove();
+                };
+            }
+
+            async function loadTheme() {
+                try {
+                    const res = await fetch("/theme.json");
+                    const theme = await res.json();
+                    const root = document.documentElement;
+                    Object.entries(theme.colors).forEach(([key, value]) => {
+                        root.style.setProperty(`--color-${key}`, value);
+                    });
+                } catch (err) {
+                    console.error("Failed to load theme:", err);
+                }
+            }
+
+            function escapeHtml(str) {
+                if (!str) return '';
+                return String(str)
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#039;');
+            }
+
+            async function loadProjects() {
+                try {
+                    const res = await fetch("/api/projects");
+                    let projects = await res.json();
+
+                    projects.sort((a, b) => {
+                        if (!a.lastUpdated) return 1;
+                        if (!b.lastUpdated) return -1;
+                        return (
+                            new Date(b.lastUpdated) - new Date(a.lastUpdated)
+                        );
+                    });
+
+                    const container =
+                        document.getElementById("projects-container");
+
+                    if (projects.length === 0) {
+                        container.innerHTML = `
+            <div class="empty-state">
+              <h3>No projects found</h3>
+              <p>Click "Create Project" to get started.</p>
+            </div>
+          `;
+                        return;
+                    }
+
+                    container.innerHTML = projects
+                        .map(
+                            (p) => `
+          <div class="project-card" onclick="location.href='/run/${p.slug}'">
+            <div class="project-header">
+              <img class="project-icon" src="/api/sprite/${p.slug}/icon.png" alt="" onerror="this.style.display='none'" />
+              <h3>${escapeHtml(p.name)}</h3>
+              <div class="project-header-right">
+                <i class="fa fa-cog settings-icon" onclick="event.stopPropagation(); openConfigModal(${JSON.stringify(p).replace(/"/g, "&quot;")})" title="Configure project"></i>
+                <i class="fa fa-copy duplicate-icon" onclick="event.stopPropagation(); duplicateProject('${p.slug}')" title="Duplicate project"></i>
+                <i class="fa fa-share export-icon" onclick="event.stopPropagation(); exportProject('${p.slug}')" title="Export to microStudio"></i>
+                <i class="fa fa-archive backup-icon" onclick="event.stopPropagation(); openBackupModal('${p.slug}')" title="Backup project"></i>
+                <i class="fa fa-trash delete-icon" onclick="event.stopPropagation(); openDeleteModal(${JSON.stringify(p).replace(/"/g, "&quot;")})" title="Delete project"></i>
+              </div>
+            </div>
+            <div class="project-details">
+              <span class="detail-item">
+                <span class="detail-label">Orientation:</span>
+                <span class="config-badge ${p.orientation || "any"}">${(p.orientation || "any").toUpperCase()}</span>
+              </span>
+              <span class="detail-item">
+                <span class="detail-label">Aspect:</span>
+                <span class="config-badge ${p.aspect || "free"}">${(p.aspect || "free").toUpperCase()}</span>
+              </span>
+              <span class="detail-item">
+                <span class="detail-label">Path:</span> /projects/${p.slug}/
+              </span>
+            </div>
+            <div class="project-footer">
+              <span class="run-hint">Click to run →</span>
+              <span class="last-updated">
+                <span class="meta-label">Last updated:</span>
+                <span class="meta-date"><i class="far fa-calendar-alt"></i> ${formatDate(p.lastUpdated)}</span>
+                <span class="meta-time"><i class="far fa-clock"></i> ${formatTime(p.lastUpdated)}</span>
+              </span>
+            </div>
+          </div>
+        `,
+                        )
+                        .join("");
+                } catch (err) {
+                    console.error("Failed to load projects:", err);
+                }
+            }
+
+            function formatDate(dateString) {
+                if (!dateString) return "";
+                const date = new Date(dateString);
+                const day = String(date.getDate()).padStart(2, "0");
+                const month = String(date.getMonth() + 1).padStart(2, "0");
+                const year = date.getFullYear();
+                return day + "." + month + "." + year;
+            }
+
+            function formatTime(dateString) {
+                if (!dateString) return "";
+                const date = new Date(dateString);
+                const hours = String(date.getHours()).padStart(2, "0");
+                const minutes = String(date.getMinutes()).padStart(2, "0");
+                return hours + ":" + minutes;
+            }
+
+            loadTheme().then(loadProjects).then(connectWebSocket);
+
+            let currentProject = null;
+            let originalSlug = null;
+            let deleteProjectData = null;
+
+            function openConfigModal(project) {
+                currentProject = project;
+                originalSlug = project.slug;
+                document.getElementById("config-name").value =
+                    project.name || project.slug;
+                document.getElementById("config-slug").value =
+                    project.slug || project.slug;
+                document.getElementById("config-slug").dataset.manual = "";
+                document.getElementById("config-orientation").value =
+                    project.orientation || "any";
+                document.getElementById("config-aspect").value =
+                    project.aspect || "free";
+                document.getElementById("config-sprite-direction").value =
+                    project.spriteDirection || "vertical";
+                document.getElementById("slug-warning").style.display = "none";
+                document.getElementById("config-modal").style.display = "flex";
+
+                document.getElementById("config-name").oninput = function (e) {
+                    const slugField = document.getElementById("config-slug");
+                    if (!slugField.dataset.manual) {
+                        slugField.value = generateSlug(e.target.value);
+                    }
+                    checkSlugChange();
+                };
+
+                document.getElementById("config-slug").oninput = function (e) {
+                    e.target.dataset.manual = "true";
+                    checkSlugChange();
+                };
+            }
+
+            function closeConfigModal() {
+                document.getElementById("config-modal").style.display = "none";
+                currentProject = null;
+                originalSlug = null;
+            }
+
+            function generateSlug(name) {
+                return name
+                    .toLowerCase()
+                    .replace(/\s+/g, "-")
+                    .replace(/[^a-z0-9-]/g, "");
+            }
+
+            function checkSlugChange() {
+                const newSlug = document.getElementById("config-slug").value;
+                const warning = document.getElementById("slug-warning");
+                if (originalSlug && newSlug !== originalSlug) {
+                    warning.style.display = "block";
+                } else {
+                    warning.style.display = "none";
+                }
+            }
+
+            async function saveConfig() {
+                if (!currentProject) return;
+
+                const newName = document
+                    .getElementById("config-name")
+                    .value.trim();
+                const newSlug = document
+                    .getElementById("config-slug")
+                    .value.trim();
+                const orientation =
+                    document.getElementById("config-orientation").value;
+                const aspect = document.getElementById("config-aspect").value;
+                const spriteDirection =
+                    document.getElementById("config-sprite-direction").value;
+
+                if (!newName || !newSlug) {
+                    alert("Name and slug are required");
+                    return;
+                }
+
+                const btn = document.getElementById("save-btn");
+                btn.disabled = true;
+                btn.textContent = "Saving...";
+
+                try {
+                    const res = await fetch(
+                        `/api/project/${currentProject.slug}/config`,
+                        {
+                            method: "PUT",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                                name: newName,
+                                slug: newSlug,
+                                orientation: orientation,
+                                aspect: aspect,
+                                spriteDirection: spriteDirection,
+                            }),
+                        },
+                    );
+
+                    const result = await res.json();
+                    if (result.success) {
+                        closeConfigModal();
+                        loadProjects();
+                    } else {
+                        alert(
+                            "Failed to save: " +
+                                (result.error || "Unknown error"),
+                        );
+                    }
+                } catch (e) {
+                    alert("Failed to save: " + e.message);
+                } finally {
+                    btn.disabled = false;
+                    btn.textContent = "Save";
+                }
+            }
+
+            document
+                .getElementById("config-modal")
+                .addEventListener("click", function (e) {
+                    if (e.target === this) closeConfigModal();
+                });
+
+            function openDeleteModal(project) {
+                deleteProjectData = project;
+                document.getElementById("delete-project-name").textContent =
+                    project.name || project.slug;
+                document.getElementById("delete-modal").style.display = "flex";
+            }
+
+            function closeDeleteModal() {
+                document.getElementById("delete-modal").style.display = "none";
+                deleteProjectData = null;
+            }
+
+            async function deleteProject() {
+                if (!deleteProjectData) {
+                    console.error("No project selected for deletion");
+                    return;
+                }
+
+                console.log("Deleting project:", deleteProjectData.slug);
+                const btn = document.getElementById("delete-btn");
+                btn.disabled = true;
+                btn.textContent = "Deleting...";
+
+                try {
+                    const res = await fetch(
+                        `/api/project/${deleteProjectData.slug}`,
+                        {
+                            method: "DELETE",
+                        },
+                    );
+
+                    console.log("Delete response status:", res.status);
+                    const result = await res.json();
+                    console.log("Delete response:", result);
+
+                    if (result.success) {
+                        closeDeleteModal();
+                        loadProjects();
+                    } else {
+                        alert(
+                            "Failed to delete: " +
+                                (result.error || "Unknown error"),
+                        );
+                    }
+                } catch (e) {
+                    console.error("Delete error:", e);
+                    alert("Failed to delete: " + e.message);
+                } finally {
+                    btn.disabled = false;
+                    btn.textContent = "Delete";
+                }
+            }
+
+            document
+                .getElementById("delete-modal")
+                .addEventListener("click", function (e) {
+                    if (e.target === this) closeDeleteModal();
+                });
+
+            function openCreateModal() {
+                document.getElementById("create-name").value = "";
+                document.getElementById("create-slug").value = "";
+                document.getElementById("create-slug").dataset.manual = "";
+                document.getElementById("create-orientation").value = "any";
+                document.getElementById("create-aspect").value = "free";
+                document.getElementById("create-modal").style.display = "flex";
+
+                document.getElementById("create-name").oninput = function (e) {
+                    const slugField = document.getElementById("create-slug");
+                    if (!slugField.dataset.manual) {
+                        slugField.value = generateSlug(e.target.value);
+                    }
+                };
+
+                document.getElementById("create-slug").oninput = function (e) {
+                    e.target.dataset.manual = "true";
+                };
+            }
+
+            function closeCreateModal() {
+                document.getElementById("create-modal").style.display = "none";
+            }
+
+            async function createProject() {
+                const name = document
+                    .getElementById("create-name")
+                    .value.trim();
+                const slug = document
+                    .getElementById("create-slug")
+                    .value.trim();
+                const orientation =
+                    document.getElementById("create-orientation").value;
+                const aspect = document.getElementById("create-aspect").value;
+                const spriteDirection =
+                    document.getElementById("create-sprite-direction").value;
+
+                if (!name) {
+                    alert("Project name is required");
+                    return;
+                }
+
+                const btn = document.getElementById("create-btn");
+                btn.disabled = true;
+                btn.textContent = "Creating...";
+
+                try {
+                    const res = await fetch("/api/projects", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            name,
+                            slug,
+                            orientation,
+                            aspect,
+                            spriteDirection,
+                        }),
+                    });
+
+                    const result = await res.json();
+                    if (result.success) {
+                        closeCreateModal();
+                        loadProjects();
+                    } else {
+                        alert(
+                            "Failed to create: " +
+                                (result.error || "Unknown error"),
+                        );
+                    }
+                } catch (e) {
+                    alert("Failed to create: " + e.message);
+                } finally {
+                    btn.disabled = false;
+                    btn.textContent = "Create";
+                }
+            }
+
+            document
+                .getElementById("create-modal")
+                .addEventListener("click", function (e) {
+                    if (e.target === this) closeCreateModal();
+                });
+
+            function connectWebSocket() {
+                const protocol =
+                    window.location.protocol === "https:" ? "wss:" : "ws:";
+                const ws = new WebSocket(
+                    `${protocol}//${window.location.host}`,
+                );
+
+                ws.onmessage = (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+                        if (data.type === "projectListUpdated") {
+                            loadProjects();
+                        }
+                    } catch (e) {
+                        console.error("WebSocket message error:", e);
+                    }
+                };
+
+                ws.onclose = () => {
+                    setTimeout(connectWebSocket, 2000);
+                };
+            }
+
+            function exportProject(projectSlug) {
+                const link = document.createElement('a');
+                link.href = `/api/project/${projectSlug}/export`;
+                const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+                link.download = `${projectSlug}_${timestamp}_export.zip`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+
+            async function duplicateProject(projectSlug) {
+                try {
+                    const res = await fetch(`/api/project/${projectSlug}/duplicate`, {
+                        method: 'POST'
+                    });
+                    const result = await res.json();
+                    if (result.success) {
+                        loadProjects();
+                        showModal('Project Duplicated', `Created duplicate "${result.name}"`, 'success');
+                    } else {
+                        showModal('Error', result.error || 'Failed to duplicate project', 'error');
+                    }
+                } catch (e) {
+                    showModal('Error', e.message, 'error');
+                }
+            }
+        </script>
+    </body>
+</html>

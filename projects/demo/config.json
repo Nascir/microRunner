@@ -1,0 +1,8 @@
+{
+  "name": "Demo Project",
+  "slug": "demo",
+  "graphics": "m1",
+  "orientation": "any",
+  "aspect": "free",
+  "public": true
+}
