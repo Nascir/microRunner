@@ -341,23 +341,11 @@
                             <ol style="margin: 0; padding-left: 20px; line-height: 2;">
                                 <li>Click "Download Update" below</li>
                                 <li>Wait for download and installation</li>
-                                <li>Stop the server: <code style="background: var(--color-darkBg); padding: 2px 6px; border-radius: 4px;">Ctrl+C</code></li>
                                 <li>Run: <code style="background: var(--color-darkBg); padding: 2px 6px; border-radius: 4px;">npm install</code></li>
                                 <li>Run: <code style="background: var(--color-darkBg); padding: 2px 6px; border-radius: 4px;">npm start</code></li>
                             </ol>
                             <p style="margin: 16px 0 0 0; font-size: 13px; color: var(--color-textSecondary);">
                                 <i class="fa fa-folder-open"></i> Your projects and backups will be preserved.
-                            </p>
-                        </div>
-                        <div id="update-instructions-complete" style="display: none; margin-top: 20px; padding: 16px; background: var(--color-accentDim); border-radius: 8px; border: 1px solid var(--color-accentBorder);">
-                            <h4 style="margin: 0 0 12px 0; color: var(--color-accent);">Update complete! Now finish the process:</h4>
-                            <ol style="margin: 0; padding-left: 20px; line-height: 2;">
-                                <li>Stop the server: <code style="background: var(--color-darkBg); padding: 2px 6px; border-radius: 4px;">Ctrl+C</code></li>
-                                <li>Run: <code style="background: var(--color-darkBg); padding: 2px 6px; border-radius: 4px;">npm install</code></li>
-                                <li>Run: <code style="background: var(--color-darkBg); padding: 2px 6px; border-radius: 4px;">npm start</code></li>
-                            </ol>
-                            <p style="margin: 16px 0 0 0; font-size: 13px; color: var(--color-textSecondary);">
-                                <i class="fa fa-folder-open"></i> Your projects and backups are preserved.
                             </p>
                         </div>
                     </div>
@@ -366,9 +354,6 @@
                     <button class="btn btn-secondary" id="update-close-btn" onclick="closeUpdateModal()">Close</button>
                     <button class="btn btn-primary" id="update-download-btn" onclick="downloadUpdate()">
                         <i class="fa fa-download"></i>&nbsp; Download Update
-                    </button>
-                    <button class="btn btn-primary" id="update-restart-btn" onclick="location.reload()" style="display: none;">
-                        <i class="fa fa-refresh"></i>&nbsp; Refresh
                     </button>
                 </div>
             </div>
@@ -939,10 +924,11 @@
 
                 document.getElementById('update-progress-section').style.display = 'none';
                 document.getElementById('update-instructions-waiting').style.display = 'block';
-                document.getElementById('update-instructions-complete').style.display = 'none';
-                document.getElementById('update-download-btn').style.display = 'inline-flex';
-                document.getElementById('update-restart-btn').style.display = 'none';
-                document.getElementById('update-close-btn').style.display = 'inline-flex';
+
+                const downloadBtn = document.getElementById('update-download-btn');
+                const closeBtn = document.getElementById('update-close-btn');
+                if (downloadBtn) downloadBtn.style.display = 'inline-flex';
+                if (closeBtn) closeBtn.style.display = 'inline-flex';
 
                 document.getElementById('update-modal').style.display = 'flex';
             }
@@ -995,6 +981,11 @@
 
                 eventSource.onerror = function() {
                     eventSource.close();
+                    // Ignore error if update was successful
+                    const msg = progressText.textContent;
+                    if (msg.includes('complete') || msg.includes('Updated to') || msg.includes('v0.')) {
+                        return; // Success - don't show error
+                    }
                     progressText.textContent = 'Connection lost. Please try again.';
                     progressText.style.color = '#ff6b6b';
                     downloadBtn.disabled = false;
@@ -1007,10 +998,27 @@
                 document.getElementById('update-modal-title').innerHTML = '<i class="fa fa-check-circle"></i> Update Complete';
                 document.getElementById('update-progress-section').style.display = 'none';
                 document.getElementById('update-instructions-waiting').style.display = 'none';
-                document.getElementById('update-instructions-complete').style.display = 'block';
                 document.getElementById('update-download-btn').style.display = 'none';
-                document.getElementById('update-restart-btn').style.display = 'inline-flex';
-                document.getElementById('update-close-btn').style.display = 'none';
+                document.getElementById('update-close-btn').style.display = 'inline-flex';
+
+                // Show server stopped message
+                const stoppedDiv = document.createElement('div');
+                stoppedDiv.id = 'update-stopped-message';
+                stoppedDiv.style.cssText = 'margin-top: 20px; padding: 16px; background: var(--color-card-bg); border-radius: 8px; border: 1px solid var(--color-accentBorder);';
+                stoppedDiv.innerHTML = `
+                    <h4 style="margin: 0 0 12px 0; color: var(--color-accent);">Update Complete</h4>
+                    <p style="margin: 0 0 12px 0; line-height: 1.6;">
+                        The update has been installed.
+                    </p>
+                    <p style="margin: 0 0 8px 0; line-height: 1.6;">
+                        <strong>To continue, run:</strong>
+                    </p>
+                    <code style="display: block; background: var(--color-darkBg); padding: 12px; border-radius: 4px; margin-bottom: 12px;">npm install&#10;npm start</code>
+                    <p style="margin: 0; font-size: 12px; color: var(--color-textSecondary);">
+                        <i class="fa fa-folder-open"></i> Your projects and backups are preserved.
+                    </p>
+                `;
+                document.getElementById('update-instructions').appendChild(stoppedDiv);
             }
 
             document.getElementById('update-btn').onclick = openUpdateModal;

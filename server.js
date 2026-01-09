@@ -1386,7 +1386,13 @@ app.get("/api/update/download", async (req, res) => {
     if (fs.existsSync(tempDir))
       fs.rmSync(tempDir, { recursive: true, force: true });
 
-    res.end();
+    console.log("\n🔄 Update complete. Server stopped.");
+    console.log("📝 Run 'npm install' then 'npm start' to continue.\n");
+
+    setTimeout(() => {
+      res.end();
+      process.exit(0);
+    }, 2000);
   } catch (e) {
     sendProgress("Error: " + e.message, 0);
     res.end();
