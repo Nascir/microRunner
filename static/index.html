@@ -15,10 +15,10 @@
             <div class="title-row">
                 <h1>micro<span class="accent">Runner</span></h1>
                 <div class="title-actions">
-                    <span id="version-badge" class="version-badge">Checking...</span>
                     <button id="update-btn" class="btn-update-compact" onclick="openUpdateModal()" style="display: none;">
                         <span id="update-btn-text">Update Available</span>
                     </button>
+                    <span id="version-badge" class="version-badge">Checking...</span>
                 </div>
             </div>
             <div class="powered-by">
@@ -321,33 +321,54 @@
         <div id="update-modal" class="modal-overlay">
             <div class="modal">
                 <div class="modal-header">
-                    <h2><i class="fa fa-download"></i> Update microRunner</h2>
+                    <h2><i class="fa fa-rocket"></i> <span id="update-modal-title">Update Available</span></h2>
                 </div>
                 <div class="modal-body">
-                    <p id="update-current-version">Current version: <strong>-</strong></p>
-                    <p id="update-latest-version">Latest version: <strong>-</strong></p>
-                    <div id="update-progress-section" style="display: none;">
-                        <div class="update-progress-text" id="update-progress-text">Preparing...</div>
+                    <div id="update-versions">
+                        <p id="update-current-version">Current version: <strong>-</strong></p>
+                        <p style="margin: 4px 0; color: var(--color-accent); font-size: 20px;">↓</p>
+                        <p id="update-latest-version">Latest version: <strong>-</strong></p>
+                    </div>
+                    <div id="update-progress-section" style="display: none; margin-top: 20px;">
+                        <div id="update-progress-text" style="margin-bottom: 8px;">Preparing...</div>
                         <div class="progress-bar">
-                            <div id="update-progress-fill" class="progress-fill"></div>
-                        </div>
-                        <div id="update-error-section" style="display: none; margin-top: 12px;">
-                            <a id="view-logs-link" href="#" onclick="openLogFile()" class="view-logs-link">
-                                <i class="fa fa-file-alt"></i> View Update Log
-                            </a>
+                            <div id="update-progress-fill" class="progress-fill" style="width: 0%;"></div>
                         </div>
                     </div>
-                    <div id="update-actions">
-                        <p class="warning-text">
-                            <i class="fa fa-exclamation-triangle"></i>
-                            Your projects and backups will be preserved.
-                        </p>
+                    <div id="update-instructions">
+                        <div id="update-instructions-waiting" style="margin-top: 20px; padding: 16px; background: var(--color-card-bg); border-radius: 8px;">
+                            <h4 style="margin: 0 0 12px 0; color: var(--color-accent);">How to update:</h4>
+                            <ol style="margin: 0; padding-left: 20px; line-height: 2;">
+                                <li>Click "Download Update" below</li>
+                                <li>Wait for download and installation</li>
+                                <li>Stop the server: <code style="background: var(--color-darkBg); padding: 2px 6px; border-radius: 4px;">Ctrl+C</code></li>
+                                <li>Run: <code style="background: var(--color-darkBg); padding: 2px 6px; border-radius: 4px;">npm install</code></li>
+                                <li>Run: <code style="background: var(--color-darkBg); padding: 2px 6px; border-radius: 4px;">npm start</code></li>
+                            </ol>
+                            <p style="margin: 16px 0 0 0; font-size: 13px; color: var(--color-textSecondary);">
+                                <i class="fa fa-folder-open"></i> Your projects and backups will be preserved.
+                            </p>
+                        </div>
+                        <div id="update-instructions-complete" style="display: none; margin-top: 20px; padding: 16px; background: var(--color-accentDim); border-radius: 8px; border: 1px solid var(--color-accentBorder);">
+                            <h4 style="margin: 0 0 12px 0; color: var(--color-accent);">Update complete! Now finish the process:</h4>
+                            <ol style="margin: 0; padding-left: 20px; line-height: 2;">
+                                <li>Stop the server: <code style="background: var(--color-darkBg); padding: 2px 6px; border-radius: 4px;">Ctrl+C</code></li>
+                                <li>Run: <code style="background: var(--color-darkBg); padding: 2px 6px; border-radius: 4px;">npm install</code></li>
+                                <li>Run: <code style="background: var(--color-darkBg); padding: 2px 6px; border-radius: 4px;">npm start</code></li>
+                            </ol>
+                            <p style="margin: 16px 0 0 0; font-size: 13px; color: var(--color-textSecondary);">
+                                <i class="fa fa-folder-open"></i> Your projects and backups are preserved.
+                            </p>
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer" id="update-modal-footer">
-                    <button class="btn btn-secondary" onclick="closeUpdateModal()">Cancel</button>
-                    <button class="btn btn-primary" id="update-apply-btn" onclick="applyUpdate()">
-                        Update Now
+                    <button class="btn btn-secondary" id="update-close-btn" onclick="closeUpdateModal()">Close</button>
+                    <button class="btn btn-primary" id="update-download-btn" onclick="downloadUpdate()">
+                        <i class="fa fa-download"></i>&nbsp; Download Update
+                    </button>
+                    <button class="btn btn-primary" id="update-restart-btn" onclick="location.reload()" style="display: none;">
+                        <i class="fa fa-refresh"></i>&nbsp; Refresh
                     </button>
                 </div>
             </div>
@@ -401,10 +422,11 @@
                 }
             }
 
-            function showModal(title, message, type, warningHtml = null) {
+            function showModal(title, message, type, warningHtml = null, button = null) {
                 const overlay = document.createElement('div');
                 overlay.className = 'dialog-overlay';
                 const iconClass = type === 'success' ? 'fa-check-circle' : (type === 'warning' ? 'fa-exclamation-triangle' : 'fa-exclamation-circle');
+                const buttonHtml = button ? `<button class="btn btn-primary" id="dialog-action">${escapeHtml(button.text)}</button>` : '';
                 overlay.innerHTML = `
                     <div class="dialog">
                         <div class="dialog-header">
@@ -415,13 +437,20 @@
                             ${warningHtml ? `<br><p style="color: #ff6b6b;">${warningHtml}</p>` : ''}
                         </div>
                         <div class="dialog-footer">
-                            <button class="btn btn-primary" id="dialog-ok">OK</button>
+                            <button class="btn btn-secondary" id="dialog-ok">OK</button>
+                            ${buttonHtml}
                         </div>
                     </div>
                 `;
                 document.body.appendChild(overlay);
 
                 document.getElementById('dialog-ok').onclick = () => overlay.remove();
+                if (button) {
+                    document.getElementById('dialog-action').onclick = () => {
+                        button.action();
+                        overlay.remove();
+                    };
+                }
                 overlay.onclick = (e) => {
                     if (e.target === overlay) overlay.remove();
                 };
@@ -874,18 +903,14 @@
                         btn.disabled = false;
                         updateData = data;
                     } else {
-                        btn.style.display = 'inline-flex';
+                        btn.style.display = 'none';
                         btn.classList.remove('has-update');
-                        btnText.textContent = 'Up to Date';
-                        btn.disabled = true;
                         updateData = null;
                     }
                 } catch (e) {
                     console.warn('Could not check for updates:', e);
                     document.getElementById('version-badge').textContent = 'v?';
-                    btn.style.display = 'inline-flex';
-                    btnText.textContent = 'Update Check Failed';
-                    btn.disabled = true;
+                    btn.style.display = 'none';
                     updateData = null;
                 }
             }
@@ -893,22 +918,31 @@
             function openUpdateModal() {
                 if (!updateData) {
                     checkUpdate();
-                    if (!updateData?.hasUpdate) {
-                        showModal('No Update', 'You are already running the latest version.', 'info');
-                        return;
-                    }
+                    setTimeout(() => {
+                        if (!updateData?.hasUpdate) {
+                            showModal('No Update', 'You are already running the latest version.', 'info');
+                            return;
+                        }
+                        showUpdateInfo();
+                    }, 500);
+                    return;
                 }
+                showUpdateInfo();
+            }
 
+            function showUpdateInfo() {
+                document.getElementById('update-modal-title').innerHTML = '<i class="fa fa-rocket"></i> Update Available';
                 document.getElementById('update-current-version').innerHTML =
                     'Current version: <strong>v' + updateData.current + '</strong>';
                 document.getElementById('update-latest-version').innerHTML =
                     'Latest version: <strong class="accent">v' + updateData.latest + '</strong>';
 
                 document.getElementById('update-progress-section').style.display = 'none';
-                document.getElementById('update-actions').style.display = 'block';
-                document.getElementById('update-modal-footer').style.display = 'flex';
-                document.getElementById('update-apply-btn').disabled = false;
-                document.getElementById('update-apply-btn').innerHTML = 'Update Now';
+                document.getElementById('update-instructions-waiting').style.display = 'block';
+                document.getElementById('update-instructions-complete').style.display = 'none';
+                document.getElementById('update-download-btn').style.display = 'inline-flex';
+                document.getElementById('update-restart-btn').style.display = 'none';
+                document.getElementById('update-close-btn').style.display = 'inline-flex';
 
                 document.getElementById('update-modal').style.display = 'flex';
             }
@@ -917,124 +951,66 @@
                 document.getElementById('update-modal').style.display = 'none';
             }
 
-            async function applyUpdate() {
-                const btn = document.getElementById('update-apply-btn');
-                btn.disabled = true;
-                btn.textContent = 'Updating...';
-
-                document.getElementById('update-actions').style.display = 'none';
-                document.getElementById('update-progress-section').style.display = 'block';
-
-                const progressFill = document.getElementById('update-progress-fill');
+            function downloadUpdate() {
+                const downloadBtn = document.getElementById('update-download-btn');
+                const closeBtn = document.getElementById('update-close-btn');
+                const progressSection = document.getElementById('update-progress-section');
                 const progressText = document.getElementById('update-progress-text');
+                const progressFill = document.getElementById('update-progress-fill');
+                const instructionsWaiting = document.getElementById('update-instructions-waiting');
+
+                downloadBtn.disabled = true;
+                downloadBtn.innerHTML = '<i class="fa fa-spinner fa-spin"></i>&nbsp; Downloading...';
+                closeBtn.style.display = 'none';
+                progressSection.style.display = 'block';
+                instructionsWaiting.style.display = 'none';
                 progressFill.style.width = '0%';
-                progressText.style.color = '';
 
-                try {
-                    const eventSource = new EventSource('/api/update/apply');
+                const eventSource = new EventSource('/api/update/download');
 
-                    eventSource.onmessage = function(event) {
-                        const data = JSON.parse(event.data);
+                eventSource.onmessage = function(event) {
+                    const data = JSON.parse(event.data);
 
-                        if (data.progress !== null && data.progress !== undefined) {
-                            progressFill.style.width = data.progress + '%';
+                    if (data.progress !== null && data.progress !== undefined) {
+                        progressFill.style.width = data.progress + '%';
+                    }
+
+                    if (data.message) {
+                        progressText.textContent = data.message;
+
+                        if (data.message.includes('Error')) {
+                            progressText.style.color = '#ff6b6b';
+                        } else if (data.message.includes('complete') || data.message.includes('Updated to')) {
+                            progressText.style.color = '#9ece6a';
                         }
+                    }
 
-                        if (data.message) {
-                            progressText.textContent = data.message;
-
-                            if (data.message.includes('Error')) {
-                                progressText.style.color = '#ff6b6b';
-                            } else if (data.message.includes('complete') || data.message.includes('Restarting')) {
-                                progressText.style.color = '#9ece6a';
-                            }
-                        }
-
-                        if (data.message && data.message.includes('complete')) {
-                            setTimeout(() => {
-                                eventSource.close();
-                                showModal('Update Complete',
-                                    'microRunner has been updated. The page will refresh automatically.',
-                                    'success');
-                                setTimeout(() => location.reload(), 3000);
-                            }, 2000);
-                        }
-
-                        if (data.message && data.message.includes('Error')) {
-                            setTimeout(() => {
-                                eventSource.close();
-                                btn.disabled = false;
-                                btn.textContent = 'Retry';
-                            }, 2000);
-                        }
-                    };
-
-                    eventSource.onerror = function() {
-                        eventSource.close();
-                        progressText.textContent = 'Connection lost. Checking update status...';
-                        progressText.style.color = '#e0af68';
-                        document.getElementById('update-error-section').style.display = 'block';
-
+                    if (data.message && (data.message.includes('complete') || data.message.includes('Updated to'))) {
                         setTimeout(() => {
-                            fetch('/api/version/local')
-                                .then(r => r.json())
-                                .then(vdata => {
-                                    fetch('/api/version')
-                                        .then(r => r.json())
-                                        .then(data => {
-                                            if (data.current === data.latest) {
-                                                progressText.textContent = 'Update Complete!';
-                                                progressText.style.color = '#9ece6a';
-                                                showModal('Update Complete',
-                                                    `microRunner has been updated to v${data.current}.`,
-                                                    'success');
-                                                setTimeout(() => location.reload(), 3000);
-                                            } else {
-                                                progressText.textContent = 'Update failed. Please try again.';
-                                                progressText.style.color = '#ff6b6b';
-                                                btn.disabled = false;
-                                                btn.textContent = 'Retry';
-                                            }
-                                        })
-                                        .catch(() => {
-                                            progressText.textContent = 'Server restarting. Please wait...';
-                                            progressText.style.color = '#e0af68';
-                                            btn.disabled = true;
-                                            setTimeout(() => location.reload(), 5000);
-                                        });
-                                })
-                                .catch(() => {
-                                    progressText.textContent = 'Server restarting. Please wait...';
-                                    progressText.style.color = '#e0af68';
-                                    btn.disabled = true;
-                                    setTimeout(() => location.reload(), 5000);
-                                });
-                        }, 3000);
-                    };
+                            eventSource.close();
+                            onUpdateComplete();
+                        }, 2000);
+                    }
+                };
 
-                } catch (e) {
-                    console.error('Update error:', e);
-                    progressText.textContent = 'Error: ' + e.message;
+                eventSource.onerror = function() {
+                    eventSource.close();
+                    progressText.textContent = 'Connection lost. Please try again.';
                     progressText.style.color = '#ff6b6b';
-                    btn.disabled = false;
-                    btn.textContent = 'Retry';
-                    document.getElementById('update-error-section').style.display = 'block';
-                }
+                    downloadBtn.disabled = false;
+                    downloadBtn.innerHTML = '<i class="fa fa-download"></i>&nbsp; Download Update';
+                    closeBtn.style.display = 'inline-flex';
+                };
             }
 
-            function openLogFile() {
-                fetch('/api/logs')
-                    .then(r => r.json())
-                    .then(logs => {
-                        if (logs.length === 0) {
-                            alert('No logs found.');
-                            return;
-                        }
-                        window.open(`/api/logs/${logs[0].name}`, '_blank');
-                    })
-                    .catch(() => {
-                        alert('Could not load logs.');
-                    });
+            function onUpdateComplete() {
+                document.getElementById('update-modal-title').innerHTML = '<i class="fa fa-check-circle"></i> Update Complete';
+                document.getElementById('update-progress-section').style.display = 'none';
+                document.getElementById('update-instructions-waiting').style.display = 'none';
+                document.getElementById('update-instructions-complete').style.display = 'block';
+                document.getElementById('update-download-btn').style.display = 'none';
+                document.getElementById('update-restart-btn').style.display = 'inline-flex';
+                document.getElementById('update-close-btn').style.display = 'none';
             }
 
             document.getElementById('update-btn').onclick = openUpdateModal;

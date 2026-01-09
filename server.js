@@ -1,21 +1,21 @@
-const express = require('express');
-const http = require('http');
-const WebSocket = require('ws');
-const path = require('path');
-const fs = require('fs');
-const chokidar = require('chokidar');
-const backup = require('./src/backup.js');
+const express = require("express");
+const http = require("http");
+const WebSocket = require("ws");
+const path = require("path");
+const fs = require("fs");
+const chokidar = require("chokidar");
+const backup = require("./src/backup.js");
 
 const PORT = process.env.PORT || 3000;
-const PROJECTS_DIR = path.join(__dirname, 'projects');
+const PROJECTS_DIR = path.join(__dirname, "projects");
 
 const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
 app.use(express.json());
-app.use(require('express-fileupload')());
-app.use(express.static(path.join(__dirname, 'static')));
+app.use(require("express-fileupload")());
+app.use(express.static(path.join(__dirname, "static")));
 
 const projectClients = new Map();
 
@@ -26,8 +26,8 @@ function ensureProjectsDir() {
 }
 
 function createDemoProject() {
-  const demoDir = path.join(PROJECTS_DIR, 'demo', 'ms');
-  const spritesDir = path.join(PROJECTS_DIR, 'demo', 'sprites');
+  const demoDir = path.join(PROJECTS_DIR, "demo", "ms");
+  const spritesDir = path.join(PROJECTS_DIR, "demo", "sprites");
 
   if (!fs.existsSync(demoDir)) {
     fs.mkdirSync(demoDir, { recursive: true });
@@ -36,9 +36,11 @@ function createDemoProject() {
     fs.mkdirSync(spritesDir, { recursive: true });
   }
 
-  const mainMs = path.join(demoDir, 'main.ms');
+  const mainMs = path.join(demoDir, "main.ms");
   if (!fs.existsSync(mainMs)) {
-    fs.writeFileSync(mainMs, `init = function()
+    fs.writeFileSync(
+      mainMs,
+      `init = function()
 end
 
 update = function()
@@ -46,19 +48,27 @@ end
 
 draw = function()
 end
-`);
+`,
+    );
   }
 
-  const configPath = path.join(PROJECTS_DIR, 'demo', 'config.json');
+  const configPath = path.join(PROJECTS_DIR, "demo", "config.json");
   if (!fs.existsSync(configPath)) {
-    fs.writeFileSync(configPath, JSON.stringify({
-      name: "Demo Project",
-      slug: "demo",
-      graphics: "m1",
-      orientation: "any",
-      aspect: "free",
-      public: true
-    }, null, 2));
+    fs.writeFileSync(
+      configPath,
+      JSON.stringify(
+        {
+          name: "Demo Project",
+          slug: "demo",
+          graphics: "m1",
+          orientation: "any",
+          aspect: "free",
+          public: true,
+        },
+        null,
+        2,
+      ),
+    );
   }
 }
 
@@ -95,7 +105,7 @@ function validatePath(project, subdir, userPath) {
   const basePath = path.resolve(PROJECTS_DIR, project, subdir);
   const resolved = path.resolve(basePath, userPath);
   const relative = path.relative(basePath, resolved);
-  if (relative.startsWith('..') || path.isAbsolute(relative)) {
+  if (relative.startsWith("..") || path.isAbsolute(relative)) {
     return null;
   }
   return resolved;
@@ -109,12 +119,16 @@ function getProjects() {
 
   for (const entry of entries) {
     if (entry.isDirectory()) {
-      const configPath = path.join(PROJECTS_DIR, entry.name, 'config.json');
-      let config = { name: entry.name, slug: entry.name, projectPath: '~/projects/' + entry.name + '/' };
+      const configPath = path.join(PROJECTS_DIR, entry.name, "config.json");
+      let config = {
+        name: entry.name,
+        slug: entry.name,
+        projectPath: "~/projects/" + entry.name + "/",
+      };
       if (fs.existsSync(configPath)) {
         try {
-          config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-          config.projectPath = '~/projects/' + entry.name + '/';
+          config = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+          config.projectPath = "~/projects/" + entry.name + "/";
         } catch (e) {
           console.warn(`Invalid config.json for ${entry.name}:`, e.message);
         }
@@ -128,53 +142,65 @@ function getProjects() {
 
 function getProjectFiles(project) {
   const projectPath = path.join(PROJECTS_DIR, project);
-  const msDir = path.join(projectPath, 'ms');
-  if (!fs.existsSync(msDir)) return { sources: [], images: [], maps: [], sounds: [], music: [], assets: [] };
+  const msDir = path.join(projectPath, "ms");
+  if (!fs.existsSync(msDir))
+    return {
+      sources: [],
+      images: [],
+      maps: [],
+      sounds: [],
+      music: [],
+      assets: [],
+    };
 
   const sources = [];
   const files = fs.readdirSync(msDir, { recursive: true });
   for (const file of files) {
-    if (file.endsWith('.ms')) {
+    if (file.endsWith(".ms")) {
       sources.push({
         file: file,
-        version: Date.now()
+        version: Date.now(),
       });
     }
   }
 
-  const spritesDir = path.join(projectPath, 'sprites');
+  const spritesDir = path.join(projectPath, "sprites");
   const images = [];
   if (fs.existsSync(spritesDir)) {
     const spriteFiles = fs.readdirSync(spritesDir);
 
     let spriteProperties = {};
 
-    const projectJsonPath = path.join(projectPath, 'project.json');
+    const projectJsonPath = path.join(projectPath, "project.json");
     if (fs.existsSync(projectJsonPath)) {
       try {
-        const projectJson = JSON.parse(fs.readFileSync(projectJsonPath, 'utf-8'));
+        const projectJson = JSON.parse(
+          fs.readFileSync(projectJsonPath, "utf-8"),
+        );
         if (projectJson.files) {
           for (const [entryPath, data] of Object.entries(projectJson.files)) {
-            if (entryPath.startsWith('sprites/') && data.properties) {
-              const fileName = entryPath.replace('sprites/', '');
+            if (entryPath.startsWith("sprites/") && data.properties) {
+              const fileName = entryPath.replace("sprites/", "");
               spriteProperties[fileName] = data.properties;
             }
           }
         }
       } catch (e) {
-        console.warn('Failed to parse project.json for', project, e);
+        console.warn("Failed to parse project.json for", project, e);
       }
     }
 
     const config = getProjectConfig(project);
-    const spriteDirection = config.spriteDirection || 'vertical';
+    const spriteDirection = config.spriteDirection || "vertical";
 
     for (const file of spriteFiles) {
       if (file.match(/\.(png|jpg|jpeg|gif)$/i)) {
-        const name = file.replace(/\.(png|jpg|jpeg|gif)$/i, '').replace(/\//g, '-');
+        const name = file
+          .replace(/\.(png|jpg|jpeg|gif)$/i, "")
+          .replace(/\//g, "-");
         const imageObj = {
-          file: name + '.png',
-          version: Date.now()
+          file: name + ".png",
+          version: Date.now(),
         };
 
         if (spriteProperties[file]) {
@@ -189,7 +215,7 @@ function getProjectFiles(project) {
                 const height = buffer.readUInt32BE(20);
                 let frames = 1;
 
-                if (spriteDirection === 'horizontal') {
+                if (spriteDirection === "horizontal") {
                   frames = Math.max(1, Math.round(width / height));
                 } else {
                   frames = Math.max(1, Math.round(height / width));
@@ -210,63 +236,65 @@ function getProjectFiles(project) {
     }
   }
 
-  const mapsDir = path.join(projectPath, 'maps');
+  const mapsDir = path.join(projectPath, "maps");
   const maps = [];
   if (fs.existsSync(mapsDir)) {
     const mapFiles = fs.readdirSync(mapsDir);
     for (const file of mapFiles) {
-      if (file.endsWith('.json') || file.endsWith('.map')) {
-        const name = file.replace(/\.(json|map)$/i, '').replace(/\//g, '-');
+      if (file.endsWith(".json") || file.endsWith(".map")) {
+        const name = file.replace(/\.(json|map)$/i, "").replace(/\//g, "-");
         maps.push({
-          file: name + '.json',
-          version: Date.now()
+          file: name + ".json",
+          version: Date.now(),
         });
       }
     }
   }
 
-  const soundsDir = path.join(PROJECTS_DIR, project, 'sounds');
+  const soundsDir = path.join(PROJECTS_DIR, project, "sounds");
   const sounds = [];
   if (fs.existsSync(soundsDir)) {
     const soundFiles = fs.readdirSync(soundsDir);
     for (const file of soundFiles) {
       if (file.match(/\.(wav|mp3|ogg)$/i)) {
-        const name = file.replace(/\.(wav|mp3|ogg)$/i, '').replace(/\//g, '-');
-        const ext = file.split('.').pop();
+        const name = file.replace(/\.(wav|mp3|ogg)$/i, "").replace(/\//g, "-");
+        const ext = file.split(".").pop();
         sounds.push({
-          file: name + '.' + ext,
-          version: Date.now()
+          file: name + "." + ext,
+          version: Date.now(),
         });
       }
     }
   }
 
-  const musicDir = path.join(PROJECTS_DIR, project, 'music');
+  const musicDir = path.join(PROJECTS_DIR, project, "music");
   const music = [];
   if (fs.existsSync(musicDir)) {
     const musicFiles = fs.readdirSync(musicDir);
     for (const file of musicFiles) {
       if (file.match(/\.(wav|mp3|ogg)$/i)) {
-        const name = file.replace(/\.(wav|mp3|ogg)$/i, '').replace(/\//g, '-');
-        const ext = file.split('.').pop();
+        const name = file.replace(/\.(wav|mp3|ogg)$/i, "").replace(/\//g, "-");
+        const ext = file.split(".").pop();
         music.push({
-          file: name + '.' + ext,
-          version: Date.now()
+          file: name + "." + ext,
+          version: Date.now(),
         });
       }
     }
   }
 
-  const assetsDir = path.join(PROJECTS_DIR, project, 'assets');
+  const assetsDir = path.join(PROJECTS_DIR, project, "assets");
   const assets = [];
   if (fs.existsSync(assetsDir)) {
     const assetFiles = fs.readdirSync(assetsDir);
     for (const file of assetFiles) {
       if (file.match(/\.(json|glb|obj|jpg|ttf|wasm|txt|csv|md)$/i)) {
-        const name = file.replace(/\.(json|glb|obj|jpg|ttf|wasm|txt|csv|md)$/i, '').replace(/\//g, '-');
+        const name = file
+          .replace(/\.(json|glb|obj|jpg|ttf|wasm|txt|csv|md)$/i, "")
+          .replace(/\//g, "-");
         assets.push({
-          file: name + '.' + file.split('.').pop(),
-          version: Date.now()
+          file: name + "." + file.split(".").pop(),
+          version: Date.now(),
         });
       }
     }
@@ -277,44 +305,44 @@ function getProjectFiles(project) {
 
 function getProjectConfig(project) {
   const projectPath = path.join(PROJECTS_DIR, project);
-  const projectJsonPath = path.join(projectPath, 'project.json');
-  const configPath = path.join(projectPath, 'config.json');
+  const projectJsonPath = path.join(projectPath, "project.json");
+  const configPath = path.join(projectPath, "config.json");
 
   if (fs.existsSync(projectJsonPath)) {
     try {
-      const projectJson = JSON.parse(fs.readFileSync(projectJsonPath, 'utf-8'));
+      const projectJson = JSON.parse(fs.readFileSync(projectJsonPath, "utf-8"));
       return {
         name: projectJson.title,
         slug: projectJson.slug,
         orientation: projectJson.orientation,
         aspect: projectJson.aspect,
-        graphics: projectJson.graphics?.toLowerCase() || 'm1',
-        spriteDirection: projectJson.spriteDirection || 'vertical',
-        public: true
+        graphics: projectJson.graphics?.toLowerCase() || "m1",
+        spriteDirection: projectJson.spriteDirection || "vertical",
+        public: true,
       };
     } catch (e) {
-      console.warn('Failed to parse project.json for', project, e);
+      console.warn("Failed to parse project.json for", project, e);
     }
   }
 
   if (fs.existsSync(configPath)) {
-    return JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+    return JSON.parse(fs.readFileSync(configPath, "utf-8"));
   }
 
   return {
     name: project,
     slug: project,
-    graphics: 'm1',
-    orientation: 'any',
-    aspect: 'free',
-    spriteDirection: 'vertical',
-    public: true
+    graphics: "m1",
+    orientation: "any",
+    aspect: "free",
+    spriteDirection: "vertical",
+    public: true,
   };
 }
 
 function handleSpriteChange(project, fileName) {
   const projectPath = path.join(PROJECTS_DIR, project);
-  const spritePath = path.join(projectPath, 'sprites', fileName);
+  const spritePath = path.join(projectPath, "sprites", fileName);
 
   if (!fs.existsSync(spritePath)) {
     return;
@@ -334,46 +362,48 @@ function handleSpriteChange(project, fileName) {
   }
 
   const config = getProjectConfig(project);
-  const spriteDirection = config.spriteDirection || 'vertical';
+  const spriteDirection = config.spriteDirection || "vertical";
 
   let frames = 1;
-  if (spriteDirection === 'horizontal') {
+  if (spriteDirection === "horizontal") {
     frames = Math.max(1, Math.round(width / height));
   } else {
     frames = Math.max(1, Math.round(height / width));
   }
 
-  const projectJsonPath = path.join(projectPath, 'project.json');
+  const projectJsonPath = path.join(projectPath, "project.json");
   let projectJson = {
-    owner: 'local',
+    owner: "local",
     title: config.name,
     slug: config.slug,
     tags: [],
     orientation: config.orientation,
     aspect: config.aspect,
     spriteDirection: spriteDirection,
-    platforms: ['computer', 'phone', 'tablet'],
-    controls: ['touch', 'mouse'],
-    type: 'app',
-    language: 'microscript_v2',
-    graphics: 'M1',
+    platforms: ["computer", "phone", "tablet"],
+    controls: ["touch", "mouse"],
+    type: "app",
+    language: "microscript_v2",
+    graphics: "M1",
     networking: false,
     libs: [],
     date_created: Date.now(),
     last_modified: Date.now(),
     first_published: 0,
     files: {},
-    description: ''
+    description: "",
   };
 
   if (fs.existsSync(projectJsonPath)) {
     try {
-      projectJson = JSON.parse(fs.readFileSync(projectJsonPath, 'utf-8'));
+      projectJson = JSON.parse(fs.readFileSync(projectJsonPath, "utf-8"));
       if (!projectJson.files) {
         projectJson.files = {};
       }
     } catch (e) {
-      console.warn(`[Server] Failed to parse project.json for ${project}, creating new one`);
+      console.warn(
+        `[Server] Failed to parse project.json for ${project}, creating new one`,
+      );
     }
   }
 
@@ -389,8 +419,8 @@ function handleSpriteChange(project, fileName) {
 
   projectJson.files[spriteEntry] = {
     properties: {
-      frames: frames
-    }
+      frames: frames,
+    },
   };
 
   projectJson.last_modified = Date.now();
@@ -404,49 +434,51 @@ function handleSpriteChange(project, fileName) {
 
 function scanProjectSprites(project) {
   const projectPath = path.join(PROJECTS_DIR, project);
-  const spritesDir = path.join(projectPath, 'sprites');
+  const spritesDir = path.join(projectPath, "sprites");
 
   if (!fs.existsSync(spritesDir)) return 0;
 
   const files = fs.readdirSync(spritesDir);
-  const imageFiles = files.filter(f => f.match(/\.(png|jpg|jpeg|gif)$/i));
+  const imageFiles = files.filter((f) => f.match(/\.(png|jpg|jpeg|gif)$/i));
 
   if (imageFiles.length === 0) return 0;
 
   const config = getProjectConfig(project);
-  const spriteDirection = config.spriteDirection || 'vertical';
-  const projectJsonPath = path.join(projectPath, 'project.json');
+  const spriteDirection = config.spriteDirection || "vertical";
+  const projectJsonPath = path.join(projectPath, "project.json");
 
   let projectJson = {
-    owner: 'local',
+    owner: "local",
     title: config.name,
     slug: config.slug,
     tags: [],
     orientation: config.orientation,
     aspect: config.aspect,
     spriteDirection: spriteDirection,
-    platforms: ['computer', 'phone', 'tablet'],
-    controls: ['touch', 'mouse'],
-    type: 'app',
-    language: 'microscript_v2',
-    graphics: 'M1',
+    platforms: ["computer", "phone", "tablet"],
+    controls: ["touch", "mouse"],
+    type: "app",
+    language: "microscript_v2",
+    graphics: "M1",
     networking: false,
     libs: [],
     date_created: Date.now(),
     last_modified: Date.now(),
     first_published: 0,
     files: {},
-    description: ''
+    description: "",
   };
 
   if (fs.existsSync(projectJsonPath)) {
     try {
-      projectJson = JSON.parse(fs.readFileSync(projectJsonPath, 'utf-8'));
+      projectJson = JSON.parse(fs.readFileSync(projectJsonPath, "utf-8"));
       if (!projectJson.files) {
         projectJson.files = {};
       }
     } catch (e) {
-      console.warn(`[Server] Failed to parse project.json for ${project}, creating new one`);
+      console.warn(
+        `[Server] Failed to parse project.json for ${project}, creating new one`,
+      );
     }
   }
 
@@ -470,7 +502,7 @@ function scanProjectSprites(project) {
     }
 
     let frames = 1;
-    if (spriteDirection === 'horizontal') {
+    if (spriteDirection === "horizontal") {
       frames = Math.max(1, Math.round(width / height));
     } else {
       frames = Math.max(1, Math.round(height / width));
@@ -482,8 +514,8 @@ function scanProjectSprites(project) {
     if (!existingProps || existingFrames !== frames) {
       projectJson.files[spriteEntry] = {
         properties: {
-          frames: frames
-        }
+          frames: frames,
+        },
       };
       updated = true;
     }
@@ -492,7 +524,9 @@ function scanProjectSprites(project) {
   if (updated) {
     projectJson.last_modified = Date.now();
     fs.writeFileSync(projectJsonPath, JSON.stringify(projectJson, null, 2));
-    console.log(`[Server] Scanned ${imageFiles.length} sprite(s) for ${project}`);
+    console.log(
+      `[Server] Scanned ${imageFiles.length} sprite(s) for ${project}`,
+    );
   }
 
   return imageFiles.length;
@@ -502,25 +536,25 @@ function watchProject(project) {
   if (projectClients.has(project)) return;
 
   const projectPath = path.join(PROJECTS_DIR, project);
-  const msDir = path.join(projectPath, 'ms');
-  const spritesDir = path.join(projectPath, 'sprites');
+  const msDir = path.join(projectPath, "ms");
+  const spritesDir = path.join(projectPath, "sprites");
 
   if (!fs.existsSync(msDir)) return;
 
   const watcher = chokidar.watch(msDir, {
     ignored: /^\./,
-    persistent: true
+    persistent: true,
   });
 
-  watcher.on('change', (filePath) => {
+  watcher.on("change", (filePath) => {
     const fileName = path.basename(filePath);
-    const content = fs.readFileSync(filePath, 'utf-8');
+    const content = fs.readFileSync(filePath, "utf-8");
 
     broadcastToProject(project, {
-      type: 'update',
-      file: fileName.replace('.ms', ''),
+      type: "update",
+      file: fileName.replace(".ms", ""),
       code: content,
-      version: Date.now()
+      version: Date.now(),
     });
 
     broadcastToAllProjects();
@@ -529,17 +563,17 @@ function watchProject(project) {
   if (fs.existsSync(spritesDir)) {
     const spriteWatcher = chokidar.watch(spritesDir, {
       ignored: /^\./,
-      persistent: true
+      persistent: true,
     });
 
-    spriteWatcher.on('add', (filePath) => {
+    spriteWatcher.on("add", (filePath) => {
       const fileName = path.basename(filePath);
       if (fileName.match(/\.(png|jpg|jpeg|gif)$/i)) {
         handleSpriteChange(project, fileName);
       }
     });
 
-    spriteWatcher.on('change', (filePath) => {
+    spriteWatcher.on("change", (filePath) => {
       const fileName = path.basename(filePath);
       if (fileName.match(/\.(png|jpg|jpeg|gif)$/i)) {
         handleSpriteChange(project, fileName);
@@ -573,7 +607,7 @@ function broadcastToProject(project, message) {
 }
 
 function broadcastToAllProjects() {
-  const message = JSON.stringify({ type: 'projectListUpdated' });
+  const message = JSON.stringify({ type: "projectListUpdated" });
   for (const client of wss.clients) {
     if (client.readyState === WebSocket.OPEN) {
       client.send(message);
@@ -582,58 +616,58 @@ function broadcastToAllProjects() {
 }
 
 function getWSClients(project) {
-  return Array.from(wss.clients).filter(client => {
+  return Array.from(wss.clients).filter((client) => {
     return client.project === project && client.readyState === WebSocket.OPEN;
   });
 }
 
-wss.on('connection', (ws, req) => {
+wss.on("connection", (ws, req) => {
   const url = new URL(req.url, `http://localhost:${PORT}`);
-  const project = url.searchParams.get('project');
+  const project = url.searchParams.get("project");
   ws.project = project;
-  
+
   if (project) {
     watchProject(project);
   }
 });
 
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'static', 'index.html'));
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "static", "index.html"));
 });
 
-app.get('/api/projects', (req, res) => {
+app.get("/api/projects", (req, res) => {
   res.json(getProjects());
 });
 
-app.get('/api/project/:name', (req, res) => {
+app.get("/api/project/:name", (req, res) => {
   const project = req.params.name;
   const config = getProjectConfig(project);
   const files = getProjectFiles(project);
   res.json({ ...config, files });
 });
 
-app.get('/api/file/:project/*', (req, res) => {
+app.get("/api/file/:project/*", (req, res) => {
   const { project } = req.params;
   const file = req.params[0];
-  const filePath = validatePath(project, 'ms', file);
+  const filePath = validatePath(project, "ms", file);
   if (!filePath) {
-    return res.status(403).send('Access denied');
+    return res.status(403).send("Access denied");
   }
   if (fs.existsSync(filePath)) {
-    res.setHeader('Content-Type', 'text/plain');
-    res.send(fs.readFileSync(filePath, 'utf-8'));
+    res.setHeader("Content-Type", "text/plain");
+    res.send(fs.readFileSync(filePath, "utf-8"));
   } else {
-    res.status(404).send('File not found');
+    res.status(404).send("File not found");
   }
 });
 
-app.put('/api/project/:name/config', (req, res) => {
+app.put("/api/project/:name/config", (req, res) => {
   const { name } = req.params;
   const newConfig = req.body;
 
-  const oldConfigPath = path.join(PROJECTS_DIR, name, 'config.json');
+  const oldConfigPath = path.join(PROJECTS_DIR, name, "config.json");
   if (!fs.existsSync(oldConfigPath)) {
-    return res.status(404).json({ error: 'Project not found' });
+    return res.status(404).json({ error: "Project not found" });
   }
 
   const oldSlug = name;
@@ -644,13 +678,15 @@ app.put('/api/project/:name/config', (req, res) => {
       const oldProjectPath = path.join(PROJECTS_DIR, oldSlug);
       const newProjectPath = path.join(PROJECTS_DIR, newSlug);
       if (fs.existsSync(newProjectPath)) {
-        return res.status(400).json({ error: 'A project with this slug already exists' });
+        return res
+          .status(400)
+          .json({ error: "A project with this slug already exists" });
       }
       fs.renameSync(oldProjectPath, newProjectPath);
     }
 
-    const configPath = path.join(PROJECTS_DIR, newSlug, 'config.json');
-    const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+    const configPath = path.join(PROJECTS_DIR, newSlug, "config.json");
+    const config = JSON.parse(fs.readFileSync(configPath, "utf-8"));
     config.name = newConfig.name;
     config.slug = newConfig.slug;
     config.orientation = newConfig.orientation;
@@ -658,9 +694,9 @@ app.put('/api/project/:name/config', (req, res) => {
     config.spriteDirection = newConfig.spriteDirection;
     fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
 
-    const projectJsonPath = path.join(PROJECTS_DIR, newSlug, 'project.json');
+    const projectJsonPath = path.join(PROJECTS_DIR, newSlug, "project.json");
     if (fs.existsSync(projectJsonPath)) {
-      const projectJson = JSON.parse(fs.readFileSync(projectJsonPath, 'utf-8'));
+      const projectJson = JSON.parse(fs.readFileSync(projectJsonPath, "utf-8"));
       projectJson.title = newConfig.name;
       projectJson.slug = newConfig.slug;
       projectJson.orientation = newConfig.orientation;
@@ -673,19 +709,23 @@ app.put('/api/project/:name/config', (req, res) => {
 
     res.json({ success: true, slug: newSlug });
   } catch (e) {
-    console.error('Failed to update project config:', e);
-    res.status(500).json({ error: 'Failed to update configuration' });
+    console.error("Failed to update project config:", e);
+    res.status(500).json({ error: "Failed to update configuration" });
   }
 });
 
-app.post('/api/projects', (req, res) => {
+app.post("/api/projects", (req, res) => {
   const { name, slug, orientation, aspect, spriteDirection } = req.body;
 
   if (!name) {
-    return res.status(400).json({ error: 'Project name is required' });
+    return res.status(400).json({ error: "Project name is required" });
   }
 
-  const generateSlug = (n) => n.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+  const generateSlug = (n) =>
+    n
+      .toLowerCase()
+      .replace(/\s+/g, "-")
+      .replace(/[^a-z0-9-]/g, "");
   const baseSlug = slug || generateSlug(name);
   let projectSlug = baseSlug;
   let counter = 1;
@@ -697,11 +737,14 @@ app.post('/api/projects', (req, res) => {
 
   try {
     const projectPath = path.join(PROJECTS_DIR, projectSlug);
-    fs.mkdirSync(path.join(projectPath, 'ms'), { recursive: true });
-    fs.mkdirSync(path.join(projectPath, 'sprites'), { recursive: true });
-    const defaultIconPath = path.join(__dirname, 'static', 'icon.png');
+    fs.mkdirSync(path.join(projectPath, "ms"), { recursive: true });
+    fs.mkdirSync(path.join(projectPath, "sprites"), { recursive: true });
+    const defaultIconPath = path.join(__dirname, "static", "icon.png");
     if (fs.existsSync(defaultIconPath)) {
-      fs.copyFileSync(defaultIconPath, path.join(projectPath, 'sprites', 'icon.png'));
+      fs.copyFileSync(
+        defaultIconPath,
+        path.join(projectPath, "sprites", "icon.png"),
+      );
     }
 
     const mainMs = `init = function()
@@ -718,7 +761,7 @@ draw = function()
   screen.drawText("Hello, World!", 0, 0, 12, "white")
 end
 `;
-    fs.writeFileSync(path.join(projectPath, 'ms', 'main.ms'), mainMs);
+    fs.writeFileSync(path.join(projectPath, "ms", "main.ms"), mainMs);
 
     const config = {
       name: name,
@@ -727,46 +770,52 @@ end
       orientation: orientation || "any",
       aspect: aspect || "free",
       spriteDirection: spriteDirection || "vertical",
-      public: true
+      public: true,
     };
-    fs.writeFileSync(path.join(projectPath, 'config.json'), JSON.stringify(config, null, 2));
+    fs.writeFileSync(
+      path.join(projectPath, "config.json"),
+      JSON.stringify(config, null, 2),
+    );
 
     const projectJson = {
-      owner: 'local',
+      owner: "local",
       title: name,
       slug: projectSlug,
       tags: [],
-      orientation: orientation || 'any',
-      aspect: aspect || 'free',
-      spriteDirection: spriteDirection || 'vertical',
-      platforms: ['computer', 'phone', 'tablet'],
-      controls: ['touch', 'mouse'],
-      type: 'app',
-      language: 'microscript_v2',
-      graphics: 'M1',
+      orientation: orientation || "any",
+      aspect: aspect || "free",
+      spriteDirection: spriteDirection || "vertical",
+      platforms: ["computer", "phone", "tablet"],
+      controls: ["touch", "mouse"],
+      type: "app",
+      language: "microscript_v2",
+      graphics: "M1",
       networking: false,
       libs: [],
       date_created: Date.now(),
       last_modified: Date.now(),
       first_published: 0,
       files: {},
-      description: ''
+      description: "",
     };
-    fs.writeFileSync(path.join(projectPath, 'project.json'), JSON.stringify(projectJson, null, 2));
+    fs.writeFileSync(
+      path.join(projectPath, "project.json"),
+      JSON.stringify(projectJson, null, 2),
+    );
 
     res.json({ success: true, slug: projectSlug });
   } catch (e) {
-    console.error('Failed to create project:', e);
-    res.status(500).json({ error: 'Failed to create project' });
+    console.error("Failed to create project:", e);
+    res.status(500).json({ error: "Failed to create project" });
   }
 });
 
-app.delete('/api/project/:name', (req, res) => {
+app.delete("/api/project/:name", (req, res) => {
   const { name } = req.params;
   const projectPath = path.join(PROJECTS_DIR, name);
 
   if (!fs.existsSync(projectPath)) {
-    return res.status(404).json({ error: 'Project not found' });
+    return res.status(404).json({ error: "Project not found" });
   }
 
   try {
@@ -774,132 +823,140 @@ app.delete('/api/project/:name', (req, res) => {
     backup.deleteAllBackups(name);
     res.json({ success: true });
   } catch (e) {
-    console.error('Failed to delete project:', e);
-    res.status(500).json({ error: 'Failed to delete project' });
+    console.error("Failed to delete project:", e);
+    res.status(500).json({ error: "Failed to delete project" });
   }
 });
 
-app.post('/api/project/:name/duplicate', (req, res) => {
+app.post("/api/project/:name/duplicate", (req, res) => {
   const { name } = req.params;
   const projectPath = path.join(PROJECTS_DIR, name);
 
   if (!fs.existsSync(projectPath)) {
-    return res.status(404).json({ error: 'Project not found' });
+    return res.status(404).json({ error: "Project not found" });
   }
 
   try {
     const result = backup.duplicateProject(name);
     res.json(result);
   } catch (e) {
-    console.error('Failed to duplicate project:', e);
-    res.status(500).json({ error: 'Failed to duplicate project' });
+    console.error("Failed to duplicate project:", e);
+    res.status(500).json({ error: "Failed to duplicate project" });
   }
 });
 
-app.get('/api/sprite/:project/*', (req, res) => {
+app.get("/api/sprite/:project/*", (req, res) => {
   const { project } = req.params;
   const spritePath = req.params[0];
-  const filePath = validatePath(project, 'sprites', spritePath);
+  const filePath = validatePath(project, "sprites", spritePath);
   if (!filePath) {
-    return res.status(403).send('Access denied');
+    return res.status(403).send("Access denied");
   }
   if (fs.existsSync(filePath)) {
     res.sendFile(filePath);
   } else {
-    res.status(404).send('Sprite not found');
+    res.status(404).send("Sprite not found");
   }
 });
 
-app.get('/api/map/:project/*', (req, res) => {
+app.get("/api/map/:project/*", (req, res) => {
   const { project } = req.params;
   const mapPath = req.params[0];
-  const filePath = validatePath(project, 'maps', mapPath);
+  const filePath = validatePath(project, "maps", mapPath);
   if (!filePath) {
-    return res.status(403).send('Access denied');
+    return res.status(403).send("Access denied");
   }
   if (fs.existsSync(filePath)) {
-    res.setHeader('Content-Type', 'application/json');
+    res.setHeader("Content-Type", "application/json");
     res.sendFile(filePath);
   } else {
-    res.status(404).send('Map not found');
+    res.status(404).send("Map not found");
   }
 });
 
-app.get('/api/sound/:project/*', (req, res) => {
+app.get("/api/sound/:project/*", (req, res) => {
   const { project } = req.params;
   const soundPath = req.params[0];
-  let filePath = validatePath(project, 'sounds', soundPath);
+  let filePath = validatePath(project, "sounds", soundPath);
   if (!filePath) {
-    return res.status(403).send('Access denied');
+    return res.status(403).send("Access denied");
   }
   if (fs.existsSync(filePath)) {
     res.sendFile(filePath);
   } else {
-    const ext = soundPath.split('.').pop();
-    if (ext !== 'wav' && ext !== 'mp3' && ext !== 'ogg') {
-      const basePath = soundPath.replace(/\.(wav|mp3|ogg)$/i, '');
-      for (const tryExt of ['wav', 'mp3', 'ogg']) {
-        const tryPath = validatePath(project, 'sounds', basePath + '.' + tryExt);
+    const ext = soundPath.split(".").pop();
+    if (ext !== "wav" && ext !== "mp3" && ext !== "ogg") {
+      const basePath = soundPath.replace(/\.(wav|mp3|ogg)$/i, "");
+      for (const tryExt of ["wav", "mp3", "ogg"]) {
+        const tryPath = validatePath(
+          project,
+          "sounds",
+          basePath + "." + tryExt,
+        );
         if (tryPath && fs.existsSync(tryPath)) {
           return res.sendFile(tryPath);
         }
       }
     }
-    res.status(404).send('Sound not found');
+    res.status(404).send("Sound not found");
   }
 });
 
-app.get('/api/music/:project/*', (req, res) => {
+app.get("/api/music/:project/*", (req, res) => {
   const { project } = req.params;
   const musicPath = req.params[0];
-  let filePath = validatePath(project, 'music', musicPath);
+  let filePath = validatePath(project, "music", musicPath);
   if (!filePath) {
-    return res.status(403).send('Access denied');
+    return res.status(403).send("Access denied");
   }
   if (fs.existsSync(filePath)) {
     res.sendFile(filePath);
   } else {
-    const ext = musicPath.split('.').pop();
-    if (ext !== 'wav' && ext !== 'mp3' && ext !== 'ogg') {
-      const basePath = musicPath.replace(/\.(wav|mp3|ogg)$/i, '');
-      for (const tryExt of ['wav', 'mp3', 'ogg']) {
-        const tryPath = validatePath(project, 'music', basePath + '.' + tryExt);
+    const ext = musicPath.split(".").pop();
+    if (ext !== "wav" && ext !== "mp3" && ext !== "ogg") {
+      const basePath = musicPath.replace(/\.(wav|mp3|ogg)$/i, "");
+      for (const tryExt of ["wav", "mp3", "ogg"]) {
+        const tryPath = validatePath(project, "music", basePath + "." + tryExt);
         if (tryPath && fs.existsSync(tryPath)) {
           return res.sendFile(tryPath);
         }
       }
     }
-    res.status(404).send('Music not found');
+    res.status(404).send("Music not found");
   }
 });
 
-app.get('/api/assets/:project/*', (req, res) => {
+app.get("/api/assets/:project/*", (req, res) => {
   const { project } = req.params;
   const assetPath = req.params[0];
-  const filePath = validatePath(project, 'assets', assetPath);
+  const filePath = validatePath(project, "assets", assetPath);
   if (!filePath) {
-    return res.status(403).send('Access denied');
+    return res.status(403).send("Access denied");
   }
   if (fs.existsSync(filePath)) {
-    res.setHeader('Content-Type', 'application/octet-stream');
+    res.setHeader("Content-Type", "application/octet-stream");
     res.sendFile(filePath);
   } else {
-    res.status(404).send('Asset not found');
+    res.status(404).send("Asset not found");
   }
 });
 
-app.post('/api/project/:name/backup', async (req, res) => {
+app.post("/api/project/:name/backup", async (req, res) => {
   const { name } = req.params;
   try {
     const result = await backup.createBackup(name);
-    res.json({ success: true, fileName: result.fileName, timestamp: result.timestamp });
+    res.json({
+      success: true,
+      fileName: result.fileName,
+      timestamp: result.timestamp,
+    });
   } catch (e) {
-    console.error('Failed to create backup:', e);
-    res.status(500).json({ error: 'Failed to create backup' });
+    console.error("Failed to create backup:", e);
+    res.status(500).json({ error: "Failed to create backup" });
   }
 });
 
-app.get('/api/project/:name/export', async (req, res) => {
+app.get("/api/project/:name/export", async (req, res) => {
   const { name } = req.params;
   try {
     const result = await backup.createExport(name);
@@ -909,82 +966,82 @@ app.get('/api/project/:name/export', async (req, res) => {
       }
     });
   } catch (e) {
-    console.error('Failed to export project:', e);
-    res.status(500).json({ error: 'Failed to export project' });
+    console.error("Failed to export project:", e);
+    res.status(500).json({ error: "Failed to export project" });
   }
 });
 
-app.get('/api/project/:name/backups', (req, res) => {
+app.get("/api/project/:name/backups", (req, res) => {
   const { name } = req.params;
   try {
     const backups = backup.listBackups(name);
     res.json(backups);
   } catch (e) {
-    console.error('Failed to list backups:', e);
-    res.status(500).json({ error: 'Failed to list backups' });
+    console.error("Failed to list backups:", e);
+    res.status(500).json({ error: "Failed to list backups" });
   }
 });
 
-app.delete('/api/project/:name/backups/:file', (req, res) => {
+app.delete("/api/project/:name/backups/:file", (req, res) => {
   const { name, file } = req.params;
   try {
     backup.deleteBackup(name, file);
     res.json({ success: true });
   } catch (e) {
-    console.error('Failed to delete backup:', e);
-    res.status(500).json({ error: 'Failed to delete backup' });
+    console.error("Failed to delete backup:", e);
+    res.status(500).json({ error: "Failed to delete backup" });
   }
 });
 
-app.get('/api/project/:name/backups/:file/download', (req, res) => {
+app.get("/api/project/:name/backups/:file/download", (req, res) => {
   const { name, file } = req.params;
   try {
     const filePath = backup.getBackupPath(name, file);
     if (fs.existsSync(filePath)) {
       res.download(filePath, file);
     } else {
-      res.status(404).json({ error: 'Backup file not found' });
+      res.status(404).json({ error: "Backup file not found" });
     }
   } catch (e) {
-    console.error('Failed to download backup:', e);
-    res.status(500).json({ error: 'Failed to download backup' });
+    console.error("Failed to download backup:", e);
+    res.status(500).json({ error: "Failed to download backup" });
   }
 });
 
-app.post('/api/project/:name/restore', async (req, res) => {
+app.post("/api/project/:name/restore", async (req, res) => {
   const { name } = req.params;
   const { backupFile, createPreRestoreBackup } = req.body;
 
   if (!backupFile) {
-    return res.status(400).json({ error: 'Backup file is required' });
+    return res.status(400).json({ error: "Backup file is required" });
   }
 
   try {
     const result = await backup.restoreProject(name, backupFile, {
-      createPreRestoreBackup: createPreRestoreBackup
+      createPreRestoreBackup: createPreRestoreBackup,
     });
     res.json(result);
   } catch (e) {
-    console.error('Failed to restore backup:', e);
-    res.status(500).json({ error: 'Failed to restore backup: ' + e.message });
+    console.error("Failed to restore backup:", e);
+    res.status(500).json({ error: "Failed to restore backup: " + e.message });
   }
 });
 
-app.post('/api/project/:name/restore-upload', async (req, res) => {
+app.post("/api/project/:name/restore-upload", async (req, res) => {
   const { name } = req.params;
 
   if (!req.files || !req.files.backup) {
-    return res.status(400).json({ error: 'No backup file uploaded' });
+    return res.status(400).json({ error: "No backup file uploaded" });
   }
 
   const backupFile = req.files.backup;
-  const tempPath = path.join(__dirname, 'temp_upload_' + Date.now() + '.zip');
+  const tempPath = path.join(__dirname, "temp_upload_" + Date.now() + ".zip");
 
   try {
     await backupFile.mv(tempPath);
 
     await backup.restoreProjectFromUpload(name, tempPath, {
-      createPreRestoreBackup: true
+      createPreRestoreBackup: true,
     });
 
     fs.unlinkSync(tempPath);
@@ -994,18 +1051,18 @@ app.post('/api/project/:name/restore-upload', async (req, res) => {
     if (fs.existsSync(tempPath)) {
       fs.unlinkSync(tempPath);
     }
-    console.error('Failed to restore from uploaded backup:', e);
-    res.status(500).json({ error: 'Failed to restore backup: ' + e.message });
+    console.error("Failed to restore from uploaded backup:", e);
+    res.status(500).json({ error: "Failed to restore backup: " + e.message });
   }
 });
 
-app.post('/api/import-project', async (req, res) => {
+app.post("/api/import-project", async (req, res) => {
   if (!req.files || !req.files.file) {
-    return res.status(400).json({ error: 'No file uploaded' });
+    return res.status(400).json({ error: "No file uploaded" });
   }
 
   const uploadedFile = req.files.file;
-  const tempPath = path.join(__dirname, 'temp_import_' + Date.now() + '.zip');
+  const tempPath = path.join(__dirname, "temp_import_" + Date.now() + ".zip");
 
   try {
     await uploadedFile.mv(tempPath);
@@ -1019,20 +1076,23 @@ app.post('/api/import-project', async (req, res) => {
     if (fs.existsSync(tempPath)) {
       fs.unlinkSync(tempPath);
     }
-    console.error('Failed to import project:', e);
+    console.error("Failed to import project:", e);
     res.status(500).json({ error: e.message });
   }
 });
 
-app.post('/api/project/:name/backups/upload', async (req, res) => {
+app.post("/api/project/:name/backups/upload", async (req, res) => {
   const { name } = req.params;
 
   if (!req.files || !req.files.file) {
-    return res.status(400).json({ error: 'No file uploaded' });
+    return res.status(400).json({ error: "No file uploaded" });
   }
 
   const uploadedFile = req.files.file;
-  const tempPath = path.join(__dirname, 'temp_backup_upload_' + Date.now() + '.zip');
+  const tempPath = path.join(
+    __dirname,
+    "temp_backup_upload_" + Date.now() + ".zip",
+  );
 
   try {
     await uploadedFile.mv(tempPath);
@@ -1046,312 +1106,246 @@ app.post('/api/project/:name/backups/upload', async (req, res) => {
     if (fs.existsSync(tempPath)) {
       fs.unlinkSync(tempPath);
     }
-    console.error('Failed to upload backup:', e);
+    console.error("Failed to upload backup:", e);
     res.status(500).json({ error: e.message });
   }
 });
 
-app.get('/api/project/:name/backups/:file/note', (req, res) => {
+app.get("/api/project/:name/backups/:file/note", (req, res) => {
   const { name, file } = req.params;
   try {
     const note = backup.getBackupNote(name, file);
     res.json({ note });
   } catch (e) {
-    console.error('Failed to get note:', e);
-    res.status(500).json({ error: 'Failed to get note' });
+    console.error("Failed to get note:", e);
+    res.status(500).json({ error: "Failed to get note" });
   }
 });
 
-app.put('/api/project/:name/backups/:file/note', (req, res) => {
+app.put("/api/project/:name/backups/:file/note", (req, res) => {
   const { name, file } = req.params;
   const { note } = req.body;
   try {
-    backup.saveBackupNote(name, file, note || '');
+    backup.saveBackupNote(name, file, note || "");
     res.json({ success: true });
   } catch (e) {
-    console.error('Failed to save note:', e);
-    res.status(500).json({ error: 'Failed to save note' });
+    console.error("Failed to save note:", e);
+    res.status(500).json({ error: "Failed to save note" });
   }
 });
 
-app.delete('/api/project/:name/backups/:file/note', (req, res) => {
+app.delete("/api/project/:name/backups/:file/note", (req, res) => {
   const { name, file } = req.params;
   try {
     backup.deleteBackupNote(name, file);
     res.json({ success: true });
   } catch (e) {
-    console.error('Failed to delete note:', e);
-    res.status(500).json({ error: 'Failed to delete note' });
+    console.error("Failed to delete note:", e);
+    res.status(500).json({ error: "Failed to delete note" });
   }
 });
 
-app.get('/run/:project', (req, res) => {
-  res.sendFile(path.join(__dirname, 'static', 'game.html'));
+app.get("/run/:project", (req, res) => {
+  res.sendFile(path.join(__dirname, "static", "game.html"));
 });
 
-const GITHUB_REPO = 'Nascir/microrunner';
+const GITHUB_REPO = "Nascir/microrunner";
 
-async function getLatestRelease() {
-  return new Promise((resolve, reject) => {
-    const https = require('https');
-    const req = https.get(
+app.get("/api/version", (req, res) => {
+  const pkg = JSON.parse(
+    fs.readFileSync(path.join(__dirname, "package.json"), "utf-8"),
+  );
+  const currentVersion = pkg.version;
+
+  const https = require("https");
+  https
+    .get(
       `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`,
       {
         headers: {
-          'User-Agent': 'microRunner-Updater',
-          'Accept': 'application/vnd.github.v3+json'
-        }
+          "User-Agent": "microRunner",
+          Accept: "application/vnd.github.v3+json",
+        },
       },
-      (res) => {
-        let data = '';
-        res.on('data', chunk => data += chunk);
-        res.on('end', () => {
+      (response) => {
+        let data = "";
+        response.on("data", (chunk) => (data += chunk));
+        response.on("end", () => {
           try {
             const release = JSON.parse(data);
-            resolve(release);
+            const latestVersion =
+              release.tag_name?.replace(/^v/, "") || currentVersion;
+            res.json({
+              current: currentVersion,
+              latest: latestVersion,
+              hasUpdate: latestVersion !== currentVersion,
+              releaseUrl: release.html_url || null,
+              downloadUrl: release.zipball_url || null,
+              publishedAt: release.published_at || null,
+            });
           } catch (e) {
-            reject(new Error('Failed to parse GitHub response'));
+            res.json({
+              current: currentVersion,
+              latest: currentVersion,
+              hasUpdate: false,
+              releaseUrl: null,
+              downloadUrl: null,
+              publishedAt: null,
+              error: "Failed to check updates",
+            });
           }
         });
-      }
-    );
-    req.on('error', (e) => reject(e));
-    req.setTimeout(5000, () => {
-      req.destroy();
-      reject(new Error('GitHub API request timeout'));
+      },
+    )
+    .on("error", () => {
+      res.json({
+        current: currentVersion,
+        latest: currentVersion,
+        hasUpdate: false,
+        releaseUrl: null,
+        downloadUrl: null,
+        publishedAt: null,
+        error: "Connection failed",
+      });
     });
-  });
-}
+});
 
-app.get('/api/version', async (req, res) => {
-  const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, 'package.json'), 'utf-8'));
+app.get("/api/update/download", async (req, res) => {
+  const https = require("https");
+  const AdmZip = require("adm-zip");
+
+  const pkg = JSON.parse(
+    fs.readFileSync(path.join(__dirname, "package.json"), "utf-8"),
+  );
   const currentVersion = pkg.version;
 
-  try {
-    const release = await getLatestRelease();
-    const latestVersion = release.tag_name?.replace(/^v/, '') || currentVersion;
-    const hasUpdate = latestVersion !== currentVersion;
-
-    res.json({
-      current: currentVersion,
-      latest: latestVersion,
-      hasUpdate: hasUpdate,
-      releaseUrl: release.html_url || null,
-      publishedAt: release.published_at || null
-    });
-  } catch (e) {
-    console.warn('[Version] Could not check for updates:', e.message);
-    res.json({
-      current: currentVersion,
-      latest: currentVersion,
-      hasUpdate: false,
-      releaseUrl: null,
-      publishedAt: null,
-      error: 'Could not check for updates'
-    });
-  }
-});
-
-app.get('/api/version/local', (req, res) => {
-  const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, 'package.json'), 'utf-8'));
-  res.json({ version: pkg.version });
-});
-
-app.get('/api/update/apply', async (req, res) => {
-  const https = require('https');
-  const AdmZip = require('adm-zip');
-  const { exec } = require('child_process');
-
-  const currentVersion = require('./package.json').version;
-
-  // Create logs directory if it doesn't exist
-  const logsDir = path.join(__dirname, 'logs');
-  if (!fs.existsSync(logsDir)) {
-    fs.mkdirSync(logsDir, { recursive: true });
-  }
-
-  // Create log file for this update
-  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-  const logFile = path.join(logsDir, `update_${timestamp}.log`);
-  let logStream = fs.createWriteStream(logFile, { flags: 'a' });
-
-  function writeLog(level, message) {
-    const time = new Date().toISOString().substr(11, 8);
-    const logLine = `[${time}] [${level}] ${message}\n`;
-    logStream.write(logLine);
-    console.log(logLine.trim());
-  }
+  res.writeHead(200, {
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache",
+  });
+  res.write("\n");
 
   function sendProgress(message, progress = null) {
-    // Simple message for user (no debug info)
     const data = { message };
-    if (progress !== null) {
-      data.progress = progress;
-    }
+    if (progress !== null) data.progress = progress;
     res.write(`data: ${JSON.stringify(data)}\n\n`);
   }
 
   try {
-    res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache' });
-    res.write('\n');
+    sendProgress("Checking for latest version...", 5);
 
-    writeLog('INFO', `=== Starting update from v${currentVersion} ===`);
-    writeLog('INFO', `Log file: ${logFile}`);
+    const release = await new Promise((resolve, reject) => {
+      https
+        .get(
+          `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`,
+          {
+            headers: {
+              "User-Agent": "microRunner",
+              Accept: "application/vnd.github.v3+json",
+            },
+          },
+          (response) => {
+            let data = "";
+            response.on("data", (chunk) => (data += chunk));
+            response.on("end", () => {
+              try {
+                resolve(JSON.parse(data));
+              } catch (e) {
+                reject(new Error("Failed to parse GitHub response"));
+              }
+            });
+          },
+        )
+        .on("error", reject);
+    });
 
-    let release;
-    try {
-      writeLog('STEP', 'Checking GitHub for latest release...');
-      sendProgress('Checking for latest version...', 5);
-      release = await getLatestRelease();
-      writeLog('INFO', `Found release: ${release.tag_name}`);
-    } catch (e) {
-      writeLog('ERROR', `GitHub API failed: ${e.message}`);
-      sendProgress('Error: Could not connect to GitHub', 0);
-      res.end();
-      return;
-    }
-
-    const latestVersion = release.tag_name?.replace(/^v/, '');
-    writeLog('INFO', `Current: ${currentVersion}, Latest: ${latestVersion}`);
-
-    if (!latestVersion) {
-      writeLog('ERROR', 'Could not parse latest version');
-      sendProgress('Error: Invalid version from GitHub', 0);
-      res.end();
-      return;
-    }
-
+    const latestVersion = release.tag_name?.replace(/^v/, "");
     if (latestVersion === currentVersion) {
-      writeLog('INFO', 'Already up to date');
-      sendProgress('Already up to date', 100);
+      sendProgress("Already up to date", 100);
       res.end();
       return;
     }
 
-    writeLog('STEP', `Downloading v${latestVersion}...`);
-    sendProgress(`Downloading version ${latestVersion}...`, 20);
+    sendProgress(`Downloading v${latestVersion}...`, 20);
 
     const zipUrl = `https://github.com/${GITHUB_REPO}/archive/refs/tags/v${latestVersion}.zip`;
     const tempZip = path.join(__dirname, `temp_update_${Date.now()}.zip`);
 
-    try {
-      await new Promise((resolve, reject) => {
-        let redirects = 0;
+    await new Promise((resolve, reject) => {
+      let redirects = 0;
 
-        function doRequest(url) {
-          if (redirects > 5) {
-            reject(new Error('Too many redirects'));
-            return;
-          }
-
-          const req = https.get(url, { headers: { 'User-Agent': 'microRunner-Updater' } }, (response) => {
-            if (response.statusCode === 302 || response.statusCode === 301) {
-              redirects++;
-              const location = response.headers.location;
-              if (!location) {
-                reject(new Error('Redirect without location'));
-                return;
-              }
-              const nextUrl = location.startsWith('http') ? location : `https://github.com${location}`;
-              doRequest(nextUrl);
-              return;
-            }
-
-            if (response.statusCode !== 200) {
-              reject(new Error(`HTTP ${response.statusCode}`));
-              return;
-            }
-
-            const file = fs.createWriteStream(tempZip);
-            response.pipe(file);
-            file.on('finish', () => {
-              file.close();
-              const stats = fs.statSync(tempZip);
-              writeLog('INFO', `Downloaded ZIP: ${stats.size} bytes`);
-              resolve();
-            });
-            file.on('error', (err) => {
-              if (fs.existsSync(tempZip)) fs.unlinkSync(tempZip);
-              reject(err);
-            });
-          });
-
-          req.on('error', (err) => {
-            reject(err);
-          });
-
-          req.setTimeout(60000, () => {
-            req.destroy();
-            reject(new Error('Download timeout (60s)'));
-          });
+      function doRequest(url) {
+        if (redirects > 5) {
+          reject(new Error("Too many redirects"));
+          return;
         }
 
-        doRequest(zipUrl);
-      });
-    } catch (e) {
-      writeLog('ERROR', `Download failed: ${e.message}`);
-      sendProgress('Error: Download failed', 0);
-      res.end();
-      return;
-    }
+        https
+          .get(
+            url,
+            { headers: { "User-Agent": "microRunner" } },
+            (response) => {
+              if (response.statusCode === 302 || response.statusCode === 301) {
+                redirects++;
+                const location = response.headers.location;
+                if (!location) {
+                  reject(new Error("Redirect without location"));
+                  return;
+                }
+                doRequest(
+                  location.startsWith("http")
+                    ? location
+                    : `https://github.com${location}`,
+                );
+                return;
+              }
 
-    writeLog('STEP', 'Extracting ZIP...');
-    sendProgress('Extracting files...', 40);
+              if (response.statusCode !== 200) {
+                reject(new Error(`HTTP ${response.statusCode}`));
+                return;
+              }
+
+              const file = fs.createWriteStream(tempZip);
+              response.pipe(file);
+              file.on("finish", () => {
+                file.close();
+                resolve();
+              });
+              file.on("error", (err) => {
+                if (fs.existsSync(tempZip)) fs.unlinkSync(tempZip);
+                reject(err);
+              });
+            },
+          )
+          .on("error", reject);
+      }
+
+      doRequest(zipUrl);
+    });
+
+    sendProgress("Extracting files...", 40);
 
     const tempDir = path.join(__dirname, `temp_extract_${Date.now()}`);
+    const zip = new AdmZip(tempZip);
+    zip.extractAllTo(tempDir, true);
 
-    try {
-      const zip = new AdmZip(tempZip);
-      zip.extractAllTo(tempDir, true);
-      writeLog('INFO', 'ZIP extracted successfully');
-    } catch (e) {
-      writeLog('ERROR', `Extraction failed: ${e.message}`);
-      sendProgress('Error: Extraction failed', 0);
-      if (fs.existsSync(tempZip)) fs.unlinkSync(tempZip);
-      if (fs.existsSync(tempDir)) fs.rmSync(tempDir, { recursive: true, force: true });
-      res.end();
-      return;
-    }
+    sendProgress("Installing files...", 60);
 
     const entries = fs.readdirSync(tempDir);
-    writeLog('INFO', `Extracted directory contents: ${entries.join(', ')}`);
-
-    if (entries.length === 0) {
-      writeLog('ERROR', 'Extracted directory is empty');
-      sendProgress('Error: Empty archive', 0);
-      if (fs.existsSync(tempZip)) fs.unlinkSync(tempZip);
-      if (fs.existsSync(tempDir)) fs.rmSync(tempDir, { recursive: true, force: true });
-      res.end();
-      return;
-    }
-
-    const sourceDir = entries[0];
-    const fullSourceDir = path.join(tempDir, sourceDir);
-    writeLog('INFO', `Source directory: ${sourceDir}`);
-
-    if (!fs.existsSync(fullSourceDir)) {
-      writeLog('ERROR', `Source directory not found: ${fullSourceDir}`);
-      sendProgress('Error: Invalid archive structure', 0);
-      if (fs.existsSync(tempZip)) fs.unlinkSync(tempZip);
-      if (fs.existsSync(tempDir)) fs.rmSync(tempDir, { recursive: true, force: true });
-      res.end();
-      return;
-    }
+    const sourceDir = path.join(tempDir, entries[0]);
 
     const excludePatterns = [
-      'projects',
-      'archive',
-      '.gitignore',
-      '.DS_Store',
-      'node_modules',
-      'temp_update_',
-      'temp_extract_',
-      'logs'
+      "projects",
+      "archive",
+      ".gitignore",
+      ".DS_Store",
+      "node_modules",
+      "temp_update_",
+      "temp_extract_",
+      "logs",
     ];
 
     let filesCopied = 0;
-    let dirsCreated = 0;
-    let copyErrors = 0;
 
     function copyWithExclusions(src, dest) {
       if (!fs.existsSync(src)) return;
@@ -1359,141 +1353,45 @@ app.get('/api/update/apply', async (req, res) => {
       const stats = fs.statSync(src);
       const baseName = path.basename(src);
 
-      if (excludePatterns.some(p => baseName.includes(p))) {
-        writeLog('SKIP', baseName);
-        return;
-      }
+      if (excludePatterns.some((p) => baseName.includes(p))) return;
 
       if (stats.isDirectory()) {
-        if (!fs.existsSync(dest)) {
-          fs.mkdirSync(dest, { recursive: true });
-          dirsCreated++;
-        }
-        const entries = fs.readdirSync(src);
-        for (const entry of entries) {
+        if (!fs.existsSync(dest)) fs.mkdirSync(dest, { recursive: true });
+        fs.readdirSync(src).forEach((entry) => {
           copyWithExclusions(path.join(src, entry), path.join(dest, entry));
-        }
+        });
       } else {
         try {
           fs.copyFileSync(src, dest);
           filesCopied++;
         } catch (e) {
-          copyErrors++;
-          writeLog('ERROR', `Copy failed: ${baseName} - ${e.message}`);
+          console.warn(`Failed to copy ${baseName}: ${e.message}`);
         }
       }
     }
 
-    writeLog('STEP', 'Installing files...');
-    sendProgress('Installing files...', 60);
+    copyWithExclusions(sourceDir, __dirname);
 
-    copyWithExclusions(fullSourceDir, __dirname);
-    writeLog('INFO', `Copied: ${filesCopied} files, ${dirsCreated} dirs, ${copyErrors} errors`);
+    sendProgress("Verifying installation...", 80);
 
-    sendProgress('Verifying installation...', 80);
-
-    const newPackagePath = path.join(__dirname, 'package.json');
-    if (!fs.existsSync(newPackagePath)) {
-      writeLog('ERROR', 'package.json not found after copy!');
-      sendProgress('Error: Installation failed', 0);
-      if (fs.existsSync(tempZip)) fs.unlinkSync(tempZip);
-      if (fs.existsSync(tempDir)) fs.rmSync(tempDir, { recursive: true, force: true });
-      res.end();
-      return;
+    const newPackagePath = path.join(__dirname, "package.json");
+    if (fs.existsSync(newPackagePath)) {
+      const newPackage = JSON.parse(fs.readFileSync(newPackagePath, "utf-8"));
+      sendProgress(`Updated to v${newPackage.version}`, 100);
+    } else {
+      sendProgress("Update complete", 100);
     }
-
-    try {
-      const newPackage = JSON.parse(fs.readFileSync(newPackagePath, 'utf-8'));
-      const newVersion = newPackage.version;
-      writeLog('INFO', `New version installed: ${newVersion}`);
-
-      if (newVersion !== latestVersion) {
-        writeLog('ERROR', `Version mismatch! Expected ${latestVersion}, got ${newVersion}`);
-        sendProgress('Error: Version mismatch', 0);
-        res.end();
-        return;
-      }
-    } catch (e) {
-      writeLog('ERROR', `Failed to read new version: ${e.message}`);
-      sendProgress('Error: Verification failed', 0);
-      res.end();
-      return;
-    }
-
-    writeLog('STEP', 'Cleaning up temp files...');
-    sendProgress('Cleaning up...', 90);
 
     if (fs.existsSync(tempZip)) fs.unlinkSync(tempZip);
-    if (fs.existsSync(tempDir)) fs.rmSync(tempDir, { recursive: true, force: true });
+    if (fs.existsSync(tempDir))
+      fs.rmSync(tempDir, { recursive: true, force: true });
 
-    writeLog('INFO', '=== Update completed successfully ===');
-    sendProgress('Update complete. Restarting server...', 100);
-
-    setTimeout(() => {
-      res.end();
-      logStream.end();
-      console.log(`\n🔄 Updated from v${currentVersion} to v${latestVersion}`);
-      console.log(`📡 Restarting server... (copied ${filesCopied} files)\n`);
-      console.log(`📄 Log file: ${logFile}\n`);
-
-      exec('pkill -f "node server.js" || true; sleep 2; npm start', (error, stdout, stderr) => {
-        if (error) {
-          console.error('[Update] Failed to restart:', error.message);
-        }
-      });
-    }, 2000);
-
-  } catch (e) {
-    console.error('[Update] Fatal error:', e);
-    writeLog('ERROR', `Fatal error: ${e.message}`);
-    sendProgress('Error: ' + e.message, 0);
     res.end();
-    logStream.end();
+  } catch (e) {
+    sendProgress("Error: " + e.message, 0);
+    res.end();
   }
 });
-
-app.get('/api/update/status', (req, res) => {
-  const statusPath = path.join(__dirname, '.update_status');
-  if (fs.existsSync(statusPath)) {
-    res.json(JSON.parse(fs.readFileSync(statusPath, 'utf-8')));
-  } else {
-    res.json({ updating: false });
-  }
-});
-
-app.get('/api/logs', (req, res) => {
-  const logsDir = path.join(__dirname, 'logs');
-  if (!fs.existsSync(logsDir)) {
-    return res.json([]);
-  }
-
-  const files = fs.readdirSync(logsDir)
-    .filter(f => f.startsWith('update_'))
-    .sort()
-    .reverse()
-    .slice(0, 10);
-
-  const logs = files.map(f => ({
-    name: f,
-    created: fs.statSync(path.join(logsDir, f)).mtime
-  }));
-
-  res.json(logs);
-});
-
-app.get('/api/logs/:filename', (req, res) => {
-  const logPath = path.join(__dirname, 'logs', req.params.filename);
-  if (fs.existsSync(logPath)) {
-    res.download(logPath);
-  } else {
-    res.status(404).send('Log not found');
-  }
-});
-
-const logsDir = path.join(__dirname, 'logs');
-if (!fs.existsSync(logsDir)) {
-  fs.mkdirSync(logsDir, { recursive: true });
-}
 
 ensureProjectsDir();
 backup.ensureArchiveDir();
