@@ -1158,68 +1158,155 @@ app.post('/api/update/apply', async (req, res) => {
 
   const currentVersion = require('./package.json').version;
 
+  function sendProgress(message, progress = null, debug = null) {
+    const data = { message, progress };
+    if (debug !== null) {
+      data.debug = debug;
+    }
+    res.write(`data: ${JSON.stringify(data)}\n\n`);
+  }
+
+  function logToConsole(prefix, message) {
+    const timestamp = new Date().toISOString().substr(11, 8);
+    console.log(`[${timestamp}] [Update] ${prefix}: ${message}`);
+  }
+
   try {
     res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache' });
     res.write('\n');
 
-    function sendProgress(message, progress = null) {
-      res.write(`data: ${JSON.stringify({ message, progress })}\n\n`);
-    }
-
-    sendProgress('Checking for latest version...');
+    logToConsole('INFO', `Starting update from v${currentVersion}`);
 
     let release;
     try {
+      logToConsole('STEP', 'Checking GitHub for latest release...');
+      sendProgress('Checking for latest version...', 5, 'Connecting to GitHub API...');
       release = await getLatestRelease();
+      logToConsole('INFO', `Found release: ${release.tag_name}`);
     } catch (e) {
-      sendProgress('Error: Could not connect to GitHub', 0);
+      logToConsole('ERROR', `GitHub API failed: ${e.message}`);
+      sendProgress('Error: Could not connect to GitHub', 0, `Connection failed: ${e.message}`);
       res.end();
       return;
     }
 
     const latestVersion = release.tag_name?.replace(/^v/, '');
-    if (!latestVersion || latestVersion === currentVersion) {
-      sendProgress('Already up to date', 100);
+    logToConsole('INFO', `Current: ${currentVersion}, Latest: ${latestVersion}`);
+
+    if (!latestVersion) {
+      logToConsole('ERROR', 'Could not parse latest version');
+      sendProgress('Error: Invalid version from GitHub', 0, 'Could not parse version');
       res.end();
       return;
     }
 
-    sendProgress(`Downloading version ${latestVersion}...`, 20);
+    if (latestVersion === currentVersion) {
+      logToConsole('INFO', 'Already up to date');
+      sendProgress('Already up to date', 100, 'No update needed');
+      res.end();
+      return;
+    }
+
+    logToConsole('STEP', `Downloading v${latestVersion}...`);
+    sendProgress(`Downloading version ${latestVersion}...`, 10, `URL: https://github.com/${GITHUB_REPO}/archive/refs/tags/v${latestVersion}.zip`);
 
     const zipUrl = `https://github.com/${GITHUB_REPO}/archive/refs/tags/v${latestVersion}.zip`;
     const tempZip = path.join(__dirname, `temp_update_${Date.now()}.zip`);
 
-    await new Promise((resolve, reject) => {
-      const file = fs.createWriteStream(tempZip);
-      https.get(zipUrl, { headers: { 'User-Agent': 'microRunner-Updater' } }, (response) => {
-        response.pipe(file);
-        file.on('finish', () => {
-          file.close();
-          resolve();
+    try {
+      await new Promise((resolve, reject) => {
+        const file = fs.createWriteStream(tempZip);
+        const request = https.get(zipUrl, { headers: { 'User-Agent': 'microRunner-Updater' } }, (response) => {
+          if (response.statusCode !== 200) {
+            file.close();
+            fs.unlinkSync(tempZip);
+            reject(new Error(`HTTP ${response.statusCode}`));
+            return;
+          }
+          response.pipe(file);
+          file.on('finish', () => {
+            file.close();
+            const stats = fs.statSync(tempZip);
+            logToConsole('INFO', `Downloaded ZIP: ${stats.size} bytes`);
+            resolve();
+          });
         });
-      }).on('error', (err) => {
-        fs.unlinkSync(tempZip);
-        reject(err);
+        request.on('error', (err) => {
+          if (fs.existsSync(tempZip)) {
+            fs.unlinkSync(tempZip);
+                   }
+          reject(err);
+        });
+        request.setTimeout(30000, () => {
+          request.destroy();
+          if (fs.existsSync(tempZip)) {
+            fs.unlinkSync(tempZip);
+          }
+          reject(new Error('Download timeout'));
+        });
       });
-    });
+    } catch (e) {
+      logToConsole('ERROR', `Download failed: ${e.message}`);
+      sendProgress('Error: Download failed', 0, `Download error: ${e.message}`);
+      res.end();
+      return;
+    }
 
-    sendProgress('Extracting files...', 50);
+    logToConsole('STEP', 'Extracting ZIP...');
+    sendProgress('Extracting files...', 30, 'Unpacking archive...');
 
     const tempDir = path.join(__dirname, `temp_extract_${Date.now()}`);
-    const zip = new AdmZip(tempZip);
-    zip.extractAllTo(tempDir, true);
 
-    const sourceDir = fs.readdirSync(tempDir)[0];
+    try {
+      const zip = new AdmZip(tempZip);
+      zip.extractAllTo(tempDir, true);
+      logToConsole('INFO', 'ZIP extracted successfully');
+    } catch (e) {
+      logToConsole('ERROR', `Extraction failed: ${e.message}`);
+      sendProgress('Error: Extraction failed', 0, `Extract error: ${e.message}`);
+      if (fs.existsSync(tempZip)) fs.unlinkSync(tempZip);
+      if (fs.existsSync(tempDir)) fs.rmSync(tempDir, { recursive: true, force: true });
+      res.end();
+      return;
+    }
+
+    const entries = fs.readdirSync(tempDir);
+    logToConsole('INFO', `Extracted directory contents: ${entries.join(', ')}`);
+
+    if (entries.length === 0) {
+      logToConsole('ERROR', 'Extracted directory is empty');
+      sendProgress('Error: Empty archive', 0, 'Extracted dir is empty');
+      if (fs.existsSync(tempZip)) fs.unlinkSync(tempZip);
+      if (fs.existsSync(tempDir)) fs.rmSync(tempDir, { recursive: true, force: true });
+      res.end();
+      return;
+    }
+
+    const sourceDir = entries[0];
     const fullSourceDir = path.join(tempDir, sourceDir);
+    logToConsole('INFO', `Source directory: ${sourceDir}`);
 
-    sendProgress('Installing files...', 70);
+    if (!fs.existsSync(fullSourceDir)) {
+      logToConsole('ERROR', `Source directory not found: ${fullSourceDir}`);
+      sendProgress('Error: Invalid archive structure', 0, `Source dir not found: ${fullSourceDir}`);
+      if (fs.existsSync(tempZip)) fs.unlinkSync(tempZip);
+      if (fs.existsSync(tempDir)) fs.rmSync(tempDir, { recursive: true, force: true });
+      res.end();
+      return;
+    }
 
     const excludePatterns = [
       'projects',
       'archive',
       '.gitignore',
-      '.DS_Store'
+      '.DS_Store',
+      'node_modules',
+      'temp_update_',
+      'temp_extract_'
     ];
+
+    let filesCopied = 0;
+    let dirsCreated = 0;
 
     function copyWithExclusions(src, dest) {
       if (!fs.existsSync(src)) return;
@@ -1227,45 +1314,98 @@ app.post('/api/update/apply', async (req, res) => {
       const stats = fs.statSync(src);
       const baseName = path.basename(src);
 
-      if (excludePatterns.includes(baseName)) {
+      if (excludePatterns.some(p => baseName.includes(p))) {
+        logToConsole('SKIP', `Excluded: ${baseName}`);
         return;
       }
 
       if (stats.isDirectory()) {
         if (!fs.existsSync(dest)) {
           fs.mkdirSync(dest, { recursive: true });
+          dirsCreated++;
         }
         const entries = fs.readdirSync(src);
         for (const entry of entries) {
           copyWithExclusions(path.join(src, entry), path.join(dest, entry));
         }
       } else {
-        fs.copyFileSync(src, dest);
+        try {
+          fs.copyFileSync(src, dest);
+          filesCopied++;
+          if (filesCopied <= 10) {
+            logToConsole('COPY', `${baseName}`);
+          } else if (filesCopied === 11) {
+            logToConsole('COPY', '... (more files)');
+          }
+        } catch (e) {
+          logToConsole('ERROR', `Failed to copy ${baseName}: ${e.message}`);
+        }
       }
     }
 
+    logToConsole('STEP', 'Installing files...');
+    sendProgress('Installing files...', 50, `Copying from ${sourceDir}...`);
+
     copyWithExclusions(fullSourceDir, __dirname);
 
-    fs.unlinkSync(tempZip);
-    fs.rmSync(tempDir, { recursive: true, force: true });
+    logToConsole('INFO', `Copied: ${filesCopied} files, ${dirsCreated} directories`);
 
-    sendProgress('Update complete. Restarting server...', 100);
+    sendProgress('Verifying installation...', 80, `Verification: ${filesCopied} files copied`);
+
+    const newPackagePath = path.join(__dirname, 'package.json');
+    if (!fs.existsSync(newPackagePath)) {
+      logToConsole('ERROR', 'package.json not found after copy!');
+      sendProgress('Error: Installation failed', 0, 'package.json not found');
+      if (fs.existsSync(tempZip)) fs.unlinkSync(tempZip);
+      if (fs.existsSync(tempDir)) fs.rmSync(tempDir, { recursive: true, force: true });
+      res.end();
+      return;
+    }
+
+    try {
+      const newPackage = JSON.parse(fs.readFileSync(newPackagePath, 'utf-8'));
+      const newVersion = newPackage.version;
+      logToConsole('INFO', `New version installed: ${newVersion}`);
+
+      if (newVersion !== latestVersion) {
+        logToConsole('ERROR', `Version mismatch! Expected ${latestVersion}, got ${newVersion}`);
+        sendProgress('Error: Version mismatch', 0, `Expected ${latestVersion}, got ${newVersion}`);
+        res.end();
+        return;
+      }
+    } catch (e) {
+      logToConsole('ERROR', `Failed to read new version: ${e.message}`);
+      sendProgress('Error: Verification failed', 0, `Parse error: ${e.message}`);
+      res.end();
+      return;
+    }
+
+    logToConsole('STEP', 'Cleaning up temp files...');
+    sendProgress('Cleaning up...', 90, 'Removing temporary files...');
+
+    if (fs.existsSync(tempZip)) fs.unlinkSync(tempZip);
+    if (fs.existsSync(tempDir)) fs.rmSync(tempDir, { recursive: true, force: true });
+
+    logToConsole('INFO', 'Update completed successfully');
+    sendProgress('Update complete. Restarting server...', 100, 'Ready to restart');
 
     setTimeout(() => {
       res.end();
       console.log(`\n🔄 Updated from v${currentVersion} to v${latestVersion}`);
-      console.log('📡 Restarting server...\n');
+      console.log(`📡 Restarting server... (copied ${filesCopied} files)\n`);
 
       exec('npm start', (error, stdout, stderr) => {
         if (error) {
-          console.error('Failed to restart:', error);
+          console.error('[Update] Failed to restart:', error.message);
+        } else {
+          console.log('[Update] Server restarted successfully');
         }
       });
-    }, 1000);
+    }, 1500);
 
   } catch (e) {
-    console.error('Update failed:', e);
-    sendProgress('Error: ' + e.message, 0);
+    console.error('[Update] Fatal error:', e);
+    sendProgress('Error: ' + e.message, 0, `Fatal error: ${e.message}`);
     res.end();
   }
 });

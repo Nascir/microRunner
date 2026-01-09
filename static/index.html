@@ -924,12 +924,28 @@
                 const progressFill = document.getElementById('update-progress-fill');
                 const progressText = document.getElementById('update-progress-text');
                 const updateLog = document.getElementById('update-log');
+                updateLog.innerHTML = '';
+                progressFill.style.width = '0%';
+                progressText.style.color = '';
+
+                function logDebug(message) {
+                    const timestamp = new Date().toLocaleTimeString();
+                    const line = document.createElement('div');
+                    line.className = 'debug-line';
+                    line.innerHTML = `<span class="debug-time">[${timestamp}]</span> ${escapeHtml(message)}`;
+                    updateLog.appendChild(line);
+                    updateLog.scrollTop = updateLog.scrollHeight;
+                    console.log(`[Update Debug] ${message}`);
+                }
+
+                logDebug('Starting update process...');
 
                 try {
                     const eventSource = new EventSource('/api/update/apply');
 
                     eventSource.onmessage = function(event) {
                         const data = JSON.parse(event.data);
+                        console.log('[Update] Received:', data);
 
                         if (data.progress !== null && data.progress !== undefined) {
                             progressFill.style.width = data.progress + '%';
@@ -943,32 +959,93 @@
                             }
                         }
 
-                        if (data.message && (data.message.includes('complete') || data.message.includes('Error'))) {
+                        if (data.debug) {
+                            logDebug(data.debug);
+                        }
+
+                        if (data.message && data.message.includes('complete')) {
+                            logDebug('Update completed! Restarting...');
                             setTimeout(() => {
-                                if (data.message.includes('complete')) {
-                                    showModal('Update Complete',
-                                        'microRunner has been updated. The page will refresh automatically.',
-                                        'success', null, () => {
-                                            setTimeout(() => location.reload(), 2000);
-                                        });
-                                }
                                 eventSource.close();
-                            }, 1500);
+                                logDebug('Checking new version...');
+                                fetch('/api/version')
+                                    .then(r => r.json())
+                                    .then(vdata => {
+                                        if (vdata.current === vdata.latest) {
+                                            logDebug(`Success! Now running v${vdata.current}`);
+                                            showModal('Update Complete',
+                                                `microRunner has been updated to v${vdata.current}.`,
+                                                'success');
+                                            setTimeout(() => location.reload(), 3000);
+                                        } else {
+                                            logDebug('Version check failed - please refresh manually');
+                                            showModal('Update May Have Failed',
+                                                'Please refresh the page to verify the update.',
+                                                'warning');
+                                        }
+                                    })
+                                    .catch(e => {
+                                        logDebug('Connection error - please refresh manually');
+                                        showModal('Connection Lost',
+                                            'Please refresh the page to continue.',
+                                            'warning');
+                                    });
+                            }, 2000);
+                        }
+
+                        if (data.message && data.message.includes('Error')) {
+                            logDebug(`Error detected: ${data.message}`);
+                            setTimeout(() => {
+                                eventSource.close();
+                            }, 2000);
                         }
                     };
 
                     eventSource.onerror = function() {
+                        logDebug('Connection lost - checking update status...');
                         eventSource.close();
-                        progressText.textContent = 'Connection lost. Please refresh the page.';
-                        progressText.style.color = '#ff6b6b';
+
+                        setTimeout(() => {
+                            fetch('/api/version')
+                                .then(r => r.json())
+                                .then(vdata => {
+                                    if (vdata.current === vdata.latest) {
+                                        logDebug(`Update successful! Now running v${vdata.current}`);
+                                        progressText.textContent = 'Update Complete!';
+                                        progressText.style.color = '#9ece6a';
+                                        showModal('Update Complete',
+                                            `microRunner has been updated to v${vdata.current}.`,
+                                            'success');
+                                        setTimeout(() => location.reload(), 3000);
+                                    } else {
+                                        logDebug(`Update failed. Current: ${vdata.current}, Latest: ${vdata.latest}`);
+                                        progressText.textContent = 'Update failed. Please try again.';
+                                        progressText.style.color = '#ff6b6b';
+                                        btn.disabled = false;
+                                        btn.textContent = 'Retry';
+                                    }
+                                })
+                                .catch(e => {
+                                    logDebug('Could not check status - server may be restarting');
+                                    progressText.textContent = 'Server restarting... Please wait.';
+                                    progressText.style.color = '#e0af68';
+                                    btn.disabled = true;
+
+                                    setTimeout(() => {
+                                        logDebug('Refreshing page...');
+                                        location.reload();
+                                    }, 5000);
+                                });
+                        }, 3000);
                     };
 
                 } catch (e) {
                     console.error('Update error:', e);
+                    logDebug(`Error: ${e.message}`);
                     progressText.textContent = 'Error: ' + e.message;
-                        progressText.style.color = '#ff6b6b';
-                        btn.disabled = false;
-                        btn.textContent = 'Update Now';
+                    progressText.style.color = '#ff6b6b';
+                    btn.disabled = false;
+                    btn.textContent = 'Retry';
                 }
             }
 
