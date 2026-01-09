@@ -1124,7 +1124,8 @@ async function getLatestRelease() {
 }
 
 app.get('/api/version', async (req, res) => {
-  const currentVersion = require('./package.json').version;
+  const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, 'package.json'), 'utf-8'));
+  const currentVersion = pkg.version;
 
   try {
     const release = await getLatestRelease();
@@ -1151,7 +1152,12 @@ app.get('/api/version', async (req, res) => {
   }
 });
 
-app.post('/api/update/apply', async (req, res) => {
+app.get('/api/version/local', (req, res) => {
+  const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, 'package.json'), 'utf-8'));
+  res.json({ version: pkg.version });
+});
+
+app.get('/api/update/apply', async (req, res) => {
   const https = require('https');
   const AdmZip = require('adm-zip');
   const { exec } = require('child_process');
@@ -1230,35 +1236,57 @@ app.post('/api/update/apply', async (req, res) => {
 
     try {
       await new Promise((resolve, reject) => {
-        const file = fs.createWriteStream(tempZip);
-        const request = https.get(zipUrl, { headers: { 'User-Agent': 'microRunner-Updater' } }, (response) => {
-          if (response.statusCode !== 200) {
-            file.close();
-            fs.unlinkSync(tempZip);
-            reject(new Error(`HTTP ${response.statusCode}`));
+        let redirects = 0;
+
+        function doRequest(url) {
+          if (redirects > 5) {
+            reject(new Error('Too many redirects'));
             return;
           }
-          response.pipe(file);
-          file.on('finish', () => {
-            file.close();
-            const stats = fs.statSync(tempZip);
-            writeLog('INFO', `Downloaded ZIP: ${stats.size} bytes`);
-            resolve();
+
+          const req = https.get(url, { headers: { 'User-Agent': 'microRunner-Updater' } }, (response) => {
+            if (response.statusCode === 302 || response.statusCode === 301) {
+              redirects++;
+              const location = response.headers.location;
+              if (!location) {
+                reject(new Error('Redirect without location'));
+                return;
+              }
+              const nextUrl = location.startsWith('http') ? location : `https://github.com${location}`;
+              doRequest(nextUrl);
+              return;
+            }
+
+            if (response.statusCode !== 200) {
+              reject(new Error(`HTTP ${response.statusCode}`));
+              return;
+            }
+
+            const file = fs.createWriteStream(tempZip);
+            response.pipe(file);
+            file.on('finish', () => {
+              file.close();
+              const stats = fs.statSync(tempZip);
+              writeLog('INFO', `Downloaded ZIP: ${stats.size} bytes`);
+              resolve();
+            });
+            file.on('error', (err) => {
+              if (fs.existsSync(tempZip)) fs.unlinkSync(tempZip);
+              reject(err);
+            });
           });
-        });
-        request.on('error', (err) => {
-          if (fs.existsSync(tempZip)) {
-            fs.unlinkSync(tempZip);
-          }
-          reject(err);
-        });
-        request.setTimeout(60000, () => {
-          request.destroy();
-          if (fs.existsSync(tempZip)) {
-            fs.unlinkSync(tempZip);
-          }
-          reject(new Error('Download timeout (60s)'));
-        });
+
+          req.on('error', (err) => {
+            reject(err);
+          });
+
+          req.setTimeout(60000, () => {
+            req.destroy();
+            reject(new Error('Download timeout (60s)'));
+          });
+        }
+
+        doRequest(zipUrl);
       });
     } catch (e) {
       writeLog('ERROR', `Download failed: ${e.message}`);
@@ -1408,7 +1436,7 @@ app.post('/api/update/apply', async (req, res) => {
       console.log(`📡 Restarting server... (copied ${filesCopied} files)\n`);
       console.log(`📄 Log file: ${logFile}\n`);
 
-      exec('npm start', (error, stdout, stderr) => {
+      exec('pkill -f "node server.js" || true; sleep 2; npm start', (error, stdout, stderr) => {
         if (error) {
           console.error('[Update] Failed to restart:', error.message);
         }
@@ -1432,6 +1460,40 @@ app.get('/api/update/status', (req, res) => {
     res.json({ updating: false });
   }
 });
+
+app.get('/api/logs', (req, res) => {
+  const logsDir = path.join(__dirname, 'logs');
+  if (!fs.existsSync(logsDir)) {
+    return res.json([]);
+  }
+
+  const files = fs.readdirSync(logsDir)
+    .filter(f => f.startsWith('update_'))
+    .sort()
+    .reverse()
+    .slice(0, 10);
+
+  const logs = files.map(f => ({
+    name: f,
+    created: fs.statSync(path.join(logsDir, f)).mtime
+  }));
+
+  res.json(logs);
+});
+
+app.get('/api/logs/:filename', (req, res) => {
+  const logPath = path.join(__dirname, 'logs', req.params.filename);
+  if (fs.existsSync(logPath)) {
+    res.download(logPath);
+  } else {
+    res.status(404).send('Log not found');
+  }
+});
+
+const logsDir = path.join(__dirname, 'logs');
+if (!fs.existsSync(logsDir)) {
+  fs.mkdirSync(logsDir, { recursive: true });
+}
 
 ensureProjectsDir();
 backup.ensureArchiveDir();

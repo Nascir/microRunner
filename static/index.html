@@ -856,7 +856,7 @@
 
             let updateData = null;
 
-            async             function checkUpdate() {
+            async function checkUpdate() {
                 const btn = document.getElementById('update-btn');
                 const btnText = document.getElementById('update-btn-text');
                 btn.disabled = true;
@@ -976,22 +976,32 @@
                         document.getElementById('update-error-section').style.display = 'block';
 
                         setTimeout(() => {
-                            fetch('/api/version')
+                            fetch('/api/version/local')
                                 .then(r => r.json())
                                 .then(vdata => {
-                                    if (vdata.current === vdata.latest) {
-                                        progressText.textContent = 'Update Complete!';
-                                        progressText.style.color = '#9ece6a';
-                                        showModal('Update Complete',
-                                            `microRunner has been updated to v${vdata.current}.`,
-                                            'success');
-                                        setTimeout(() => location.reload(), 3000);
-                                    } else {
-                                        progressText.textContent = 'Update failed. Please try again.';
-                                        progressText.style.color = '#ff6b6b';
-                                        btn.disabled = false;
-                                        btn.textContent = 'Retry';
-                                    }
+                                    fetch('/api/version')
+                                        .then(r => r.json())
+                                        .then(data => {
+                                            if (data.current === data.latest) {
+                                                progressText.textContent = 'Update Complete!';
+                                                progressText.style.color = '#9ece6a';
+                                                showModal('Update Complete',
+                                                    `microRunner has been updated to v${data.current}.`,
+                                                    'success');
+                                                setTimeout(() => location.reload(), 3000);
+                                            } else {
+                                                progressText.textContent = 'Update failed. Please try again.';
+                                                progressText.style.color = '#ff6b6b';
+                                                btn.disabled = false;
+                                                btn.textContent = 'Retry';
+                                            }
+                                        })
+                                        .catch(() => {
+                                            progressText.textContent = 'Server restarting. Please wait...';
+                                            progressText.style.color = '#e0af68';
+                                            btn.disabled = true;
+                                            setTimeout(() => location.reload(), 5000);
+                                        });
                                 })
                                 .catch(() => {
                                     progressText.textContent = 'Server restarting. Please wait...';
@@ -1013,28 +1023,18 @@
             }
 
             function openLogFile() {
-                const path = require('path');
-                const { exec } = require('child_process');
-                const fs = require('fs');
-
-                const logsDir = path.join(__dirname, '..', 'logs');
-                if (!fs.existsSync(logsDir)) {
-                    alert('No logs found.');
-                    return;
-                }
-
-                const files = fs.readdirSync(logsDir)
-                    .filter(f => f.startsWith('update_'))
-                    .sort()
-                    .reverse();
-
-                if (files.length === 0) {
-                    alert('No logs found.');
-                    return;
-                }
-
-                const latestLog = path.join(logsDir, files[0]);
-                exec(`open "${latestLog}"`);
+                fetch('/api/logs')
+                    .then(r => r.json())
+                    .then(logs => {
+                        if (logs.length === 0) {
+                            alert('No logs found.');
+                            return;
+                        }
+                        window.open(`/api/logs/${logs[0].name}`, '_blank');
+                    })
+                    .catch(() => {
+                        alert('Could not load logs.');
+                    });
             }
 
             document.getElementById('update-btn').onclick = openUpdateModal;
