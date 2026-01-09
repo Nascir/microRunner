@@ -17,7 +17,7 @@
                 <div class="title-actions">
                     <span id="version-badge" class="version-badge">Checking...</span>
                     <button id="update-btn" class="btn-update-compact" onclick="openUpdateModal()" style="display: none;">
-                        <span id="update-btn-text">Update</span>
+                        <span id="update-btn-text">Update Available</span>
                     </button>
                 </div>
             </div>
@@ -866,7 +866,8 @@
                     if (data.hasUpdate) {
                         btn.style.display = 'inline-flex';
                         btn.classList.add('has-update');
-                        btnText.textContent = 'Update';
+                        btnText.textContent = 'Update Available';
+                        btn.disabled = false;
                         updateData = data;
                     } else {
                         btn.style.display = 'inline-flex';
