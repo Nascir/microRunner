@@ -1110,3 +1110,25 @@ h1 .accent {
     color: var(--color-textPrimary);
     font-family: "Monaco", "Menlo", monospace;
 }
+
+.view-logs-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--color-textMuted);
+    font-size: 0.85rem;
+    text-decoration: none;
+    padding: 8px 12px;
+    background: var(--color-darkBg);
+    border-radius: 6px;
+    transition: all 0.2s ease;
+}
+
+.view-logs-link:hover {
+    color: var(--color-accent);
+    background: var(--color-accentDim);
+}
+
+.view-logs-link i {
+    font-size: 0.9rem;
+}
