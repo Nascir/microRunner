@@ -12,7 +12,15 @@
     </head>
     <body>
         <div class="container">
-            <h1>micro<span class="accent">Runner</span></h1>
+            <div class="title-row">
+                <h1>micro<span class="accent">Runner</span></h1>
+                <div class="title-actions">
+                    <span id="version-badge" class="version-badge">Checking...</span>
+                    <button id="update-btn" class="btn-update-compact" onclick="openUpdateModal()" style="display: none;">
+                        <span id="update-btn-text">Update</span>
+                    </button>
+                </div>
+            </div>
             <div class="powered-by">
                 <span>Powered by</span>
                 <a
@@ -310,6 +318,37 @@
             </div>
         </div>
 
+        <div id="update-modal" class="modal-overlay">
+            <div class="modal">
+                <div class="modal-header">
+                    <h2><i class="fa fa-download"></i> Update microRunner</h2>
+                </div>
+                <div class="modal-body">
+                    <p id="update-current-version">Current version: <strong>-</strong></p>
+                    <p id="update-latest-version">Latest version: <strong>-</strong></p>
+                    <div id="update-progress-section" style="display: none;">
+                        <div class="update-progress-text" id="update-progress-text">Preparing...</div>
+                        <div class="progress-bar">
+                            <div id="update-progress-fill" class="progress-fill"></div>
+                        </div>
+                        <div id="update-log" class="update-log"></div>
+                    </div>
+                    <div id="update-actions">
+                        <p class="warning-text">
+                            <i class="fa fa-exclamation-triangle"></i>
+                            Your projects and backups will be preserved.
+                        </p>
+                    </div>
+                </div>
+                <div class="modal-footer" id="update-modal-footer">
+                    <button class="btn btn-secondary" onclick="closeUpdateModal()">Cancel</button>
+                    <button class="btn btn-primary" id="update-apply-btn" onclick="applyUpdate()">
+                        Update Now
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <script src="/js/backup.js"></script>
         <script>
             async function importProject(input) {
@@ -495,7 +534,7 @@
                 return hours + ":" + minutes;
             }
 
-            loadTheme().then(loadProjects).then(connectWebSocket);
+            loadTheme().then(loadProjects).then(checkUpdate).then(connectWebSocket);
 
             let currentProject = null;
             let originalSlug = null;
@@ -810,6 +849,135 @@
                     showModal('Error', e.message, 'error');
                 }
             }
+
+            let updateData = null;
+
+            async             function checkUpdate() {
+                const btn = document.getElementById('update-btn');
+                const btnText = document.getElementById('update-btn-text');
+                btn.disabled = true;
+
+                try {
+                    const res = await fetch('/api/version');
+                    const data = await res.json();
+
+                    document.getElementById('version-badge').textContent = 'v' + data.current;
+
+                    if (data.hasUpdate) {
+                        btn.style.display = 'inline-flex';
+                        btn.classList.add('has-update');
+                        btnText.textContent = 'Update';
+                        updateData = data;
+                    } else {
+                        btn.style.display = 'inline-flex';
+                        btn.classList.remove('has-update');
+                        btnText.textContent = 'Up to Date';
+                        btn.disabled = true;
+                        updateData = null;
+                    }
+                } catch (e) {
+                    console.warn('Could not check for updates:', e);
+                    document.getElementById('version-badge').textContent = 'v?';
+                    btn.style.display = 'inline-flex';
+                    btnText.textContent = 'Update Check Failed';
+                    btn.disabled = true;
+                    updateData = null;
+                }
+            }
+
+            function openUpdateModal() {
+                if (!updateData) {
+                    checkUpdate();
+                    if (!updateData?.hasUpdate) {
+                        showModal('No Update', 'You are already running the latest version.', 'info');
+                        return;
+                    }
+                }
+
+                document.getElementById('update-current-version').innerHTML =
+                    'Current version: <strong>v' + updateData.current + '</strong>';
+                document.getElementById('update-latest-version').innerHTML =
+                    'Latest version: <strong class="accent">v' + updateData.latest + '</strong>';
+
+                document.getElementById('update-progress-section').style.display = 'none';
+                document.getElementById('update-actions').style.display = 'block';
+                document.getElementById('update-modal-footer').style.display = 'flex';
+                document.getElementById('update-apply-btn').disabled = false;
+                document.getElementById('update-apply-btn').innerHTML = 'Update Now';
+
+                document.getElementById('update-modal').style.display = 'flex';
+            }
+
+            function closeUpdateModal() {
+                document.getElementById('update-modal').style.display = 'none';
+            }
+
+            async function applyUpdate() {
+                const btn = document.getElementById('update-apply-btn');
+                btn.disabled = true;
+                btn.textContent = 'Updating...';
+
+                document.getElementById('update-actions').style.display = 'none';
+                document.getElementById('update-progress-section').style.display = 'block';
+
+                const progressFill = document.getElementById('update-progress-fill');
+                const progressText = document.getElementById('update-progress-text');
+                const updateLog = document.getElementById('update-log');
+
+                try {
+                    const eventSource = new EventSource('/api/update/apply');
+
+                    eventSource.onmessage = function(event) {
+                        const data = JSON.parse(event.data);
+
+                        if (data.progress !== null && data.progress !== undefined) {
+                            progressFill.style.width = data.progress + '%';
+                        }
+
+                        if (data.message) {
+                            progressText.textContent = data.message;
+
+                            if (data.message.includes('Error')) {
+                                progressText.style.color = '#ff6b6b';
+                            }
+                        }
+
+                        if (data.message && (data.message.includes('complete') || data.message.includes('Error'))) {
+                            setTimeout(() => {
+                                if (data.message.includes('complete')) {
+                                    showModal('Update Complete',
+                                        'microRunner has been updated. The page will refresh automatically.',
+                                        'success', null, () => {
+                                            setTimeout(() => location.reload(), 2000);
+                                        });
+                                }
+                                eventSource.close();
+                            }, 1500);
+                        }
+                    };
+
+                    eventSource.onerror = function() {
+                        eventSource.close();
+                        progressText.textContent = 'Connection lost. Please refresh the page.';
+                        progressText.style.color = '#ff6b6b';
+                    };
+
+                } catch (e) {
+                    console.error('Update error:', e);
+                    progressText.textContent = 'Error: ' + e.message;
+                        progressText.style.color = '#ff6b6b';
+                        btn.disabled = false;
+                        btn.textContent = 'Update Now';
+                }
+            }
+
+            document.getElementById('update-btn').onclick = openUpdateModal;
+
+            document
+                .getElementById('update-modal')
+                .addEventListener('click', function(e) {
+                    if (e.target === this) closeUpdateModal();
+                });
         </script>
     </body>
 </html>

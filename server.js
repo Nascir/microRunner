@@ -1089,6 +1089,196 @@ app.get('/run/:project', (req, res) => {
   res.sendFile(path.join(__dirname, 'static', 'game.html'));
 });
 
+const GITHUB_REPO = 'Nascir/microrunner';
+
+async function getLatestRelease() {
+  return new Promise((resolve, reject) => {
+    const https = require('https');
+    const req = https.get(
+      `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`,
+      {
+        headers: {
+          'User-Agent': 'microRunner-Updater',
+          'Accept': 'application/vnd.github.v3+json'
+        }
+      },
+      (res) => {
+        let data = '';
+        res.on('data', chunk => data += chunk);
+        res.on('end', () => {
+          try {
+            const release = JSON.parse(data);
+            resolve(release);
+          } catch (e) {
+            reject(new Error('Failed to parse GitHub response'));
+          }
+        });
+      }
+    );
+    req.on('error', (e) => reject(e));
+    req.setTimeout(5000, () => {
+      req.destroy();
+      reject(new Error('GitHub API request timeout'));
+    });
+  });
+}
+
+app.get('/api/version', async (req, res) => {
+  const currentVersion = require('./package.json').version;
+
+  try {
+    const release = await getLatestRelease();
+    const latestVersion = release.tag_name?.replace(/^v/, '') || currentVersion;
+    const hasUpdate = latestVersion !== currentVersion;
+
+    res.json({
+      current: currentVersion,
+      latest: latestVersion,
+      hasUpdate: hasUpdate,
+      releaseUrl: release.html_url || null,
+      publishedAt: release.published_at || null
+    });
+  } catch (e) {
+    console.warn('[Version] Could not check for updates:', e.message);
+    res.json({
+      current: currentVersion,
+      latest: currentVersion,
+      hasUpdate: false,
+      releaseUrl: null,
+      publishedAt: null,
+      error: 'Could not check for updates'
+    });
+  }
+});
+
+app.post('/api/update/apply', async (req, res) => {
+  const https = require('https');
+  const AdmZip = require('adm-zip');
+  const { exec } = require('child_process');
+
+  const currentVersion = require('./package.json').version;
+
+  try {
+    res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache' });
+    res.write('\n');
+
+    function sendProgress(message, progress = null) {
+      res.write(`data: ${JSON.stringify({ message, progress })}\n\n`);
+    }
+
+    sendProgress('Checking for latest version...');
+
+    let release;
+    try {
+      release = await getLatestRelease();
+    } catch (e) {
+      sendProgress('Error: Could not connect to GitHub', 0);
+      res.end();
+      return;
+    }
+
+    const latestVersion = release.tag_name?.replace(/^v/, '');
+    if (!latestVersion || latestVersion === currentVersion) {
+      sendProgress('Already up to date', 100);
+      res.end();
+      return;
+    }
+
+    sendProgress(`Downloading version ${latestVersion}...`, 20);
+
+    const zipUrl = `https://github.com/${GITHUB_REPO}/archive/refs/tags/v${latestVersion}.zip`;
+    const tempZip = path.join(__dirname, `temp_update_${Date.now()}.zip`);
+
+    await new Promise((resolve, reject) => {
+      const file = fs.createWriteStream(tempZip);
+      https.get(zipUrl, { headers: { 'User-Agent': 'microRunner-Updater' } }, (response) => {
+        response.pipe(file);
+        file.on('finish', () => {
+          file.close();
+          resolve();
+        });
+      }).on('error', (err) => {
+        fs.unlinkSync(tempZip);
+        reject(err);
+      });
+    });
+
+    sendProgress('Extracting files...', 50);
+
+    const tempDir = path.join(__dirname, `temp_extract_${Date.now()}`);
+    const zip = new AdmZip(tempZip);
+    zip.extractAllTo(tempDir, true);
+
+    const sourceDir = fs.readdirSync(tempDir)[0];
+    const fullSourceDir = path.join(tempDir, sourceDir);
+
+    sendProgress('Installing files...', 70);
+
+    const excludePatterns = [
+      'projects',
+      'archive',
+      '.gitignore',
+      '.DS_Store'
+    ];
+
+    function copyWithExclusions(src, dest) {
+      if (!fs.existsSync(src)) return;
+
+      const stats = fs.statSync(src);
+      const baseName = path.basename(src);
+
+      if (excludePatterns.includes(baseName)) {
+        return;
+      }
+
+      if (stats.isDirectory()) {
+        if (!fs.existsSync(dest)) {
+          fs.mkdirSync(dest, { recursive: true });
+        }
+        const entries = fs.readdirSync(src);
+        for (const entry of entries) {
+          copyWithExclusions(path.join(src, entry), path.join(dest, entry));
+        }
+      } else {
+        fs.copyFileSync(src, dest);
+      }
+    }
+
+    copyWithExclusions(fullSourceDir, __dirname);
+
+    fs.unlinkSync(tempZip);
+    fs.rmSync(tempDir, { recursive: true, force: true });
+
+    sendProgress('Update complete. Restarting server...', 100);
+
+    setTimeout(() => {
+      res.end();
+      console.log(`\n🔄 Updated from v${currentVersion} to v${latestVersion}`);
+      console.log('📡 Restarting server...\n');
+
+      exec('npm start', (error, stdout, stderr) => {
+        if (error) {
+          console.error('Failed to restart:', error);
+        }
+      });
+    }, 1000);
+
+  } catch (e) {
+    console.error('Update failed:', e);
+    sendProgress('Error: ' + e.message, 0);
+    res.end();
+  }
+});
+
+app.get('/api/update/status', (req, res) => {
+  const statusPath = path.join(__dirname, '.update_status');
+  if (fs.existsSync(statusPath)) {
+    res.json(JSON.parse(fs.readFileSync(statusPath, 'utf-8')));
+  } else {
+    res.json({ updating: false });
+  }
+});
+
 ensureProjectsDir();
 backup.ensureArchiveDir();
 createDemoProject();
