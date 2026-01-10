@@ -29,7 +29,7 @@ this.Screen = class Screen {
     this.anchor_x = 0;
     this.anchor_y = 0;
     this.supersampling = this.previous_supersampling = 1;
-    this.font = "Bit Cell";
+    this.font = "BitCell";
     this.font_load_requested = {};
     this.font_loaded = {};
     this.loadFont(this.font);
@@ -326,20 +326,17 @@ this.Screen = class Screen {
   }
 
   drawLine(x1, y1, x2, y2, color) {
+    var transform;
     this.setColor(color);
     this.context.globalAlpha = this.alpha;
     this.context.lineWidth = this.line_width;
-    if (this.initDrawOp(x1, -y1)) {
-      this.context.beginPath();
-      this.context.moveTo(0, 0);
-      this.context.lineTo(x2 - x1, -(y2 - y1));
-      this.context.stroke();
-      return this.closeDrawOp(x1, -y1);
-    } else {
-      this.context.beginPath();
-      this.context.moveTo(x1, -y1);
-      this.context.lineTo(x2, -y2);
-      return this.context.stroke();
+    transform = this.initDrawOp(0, 0, false);
+    this.context.beginPath();
+    this.context.moveTo(x1, -y1);
+    this.context.lineTo(x2, -y2);
+    this.context.stroke();
+    if (transform) {
+      return this.closeDrawOp();
     }
   }
 
@@ -366,7 +363,7 @@ this.Screen = class Screen {
     return this.loadFont(this.font);
   }
 
-  loadFont(font = "Bit Cell") {
+  loadFont(font = "BitCell") {
     var err;
     if (!this.font_load_requested[font]) {
       this.font_load_requested[font] = true;
@@ -578,6 +575,152 @@ this.Screen = class Screen {
     }
   }
 
+  drawPolyline(args) {
+    var i, j, len, ref, transform;
+    if (args.length > 0 && args.length % 2 === 1 && typeof args[args.length - 1] === "string") {
+      this.setColor(args[args.length - 1]);
+    }
+    if (Array.isArray(args[0])) {
+      if ((args[1] != null) && typeof args[1] === "string") {
+        this.setColor(args[1]);
+      }
+      args = args[0];
+    }
+    this.context.globalAlpha = this.alpha;
+    this.context.lineWidth = this.line_width;
+    if (args.length < 4) {
+      return;
+    }
+    len = Math.floor(args.length / 2);
+    transform = this.initDrawOp(0, 0, false);
+    this.context.beginPath();
+    this.context.moveTo(args[0], -args[1]);
+    for (i = j = 1, ref = len - 1; (1 <= ref ? j <= ref : j >= ref); i = 1 <= ref ? ++j : --j) {
+      this.context.lineTo(args[i * 2], -args[i * 2 + 1]);
+    }
+    this.context.stroke();
+    if (transform) {
+      return this.closeDrawOp();
+    }
+  }
+
+  drawPolygon(args) {
+    var i, j, len, ref, transform;
+    if (args.length > 0 && args.length % 2 === 1 && typeof args[args.length - 1] === "string") {
+      this.setColor(args[args.length - 1]);
+    }
+    if (Array.isArray(args[0])) {
+      if ((args[1] != null) && typeof args[1] === "string") {
+        this.setColor(args[1]);
+      }
+      args = args[0];
+    }
+    this.context.globalAlpha = this.alpha;
+    this.context.lineWidth = this.line_width;
+    if (args.length < 4) {
+      return;
+    }
+    len = Math.floor(args.length / 2);
+    transform = this.initDrawOp(0, 0, false);
+    this.context.beginPath();
+    this.context.moveTo(args[0], -args[1]);
+    for (i = j = 1, ref = len - 1; (1 <= ref ? j <= ref : j >= ref); i = 1 <= ref ? ++j : --j) {
+      this.context.lineTo(args[i * 2], -args[i * 2 + 1]);
+    }
+    this.context.closePath();
+    this.context.stroke();
+    if (transform) {
+      return this.closeDrawOp();
+    }
+  }
+
+  fillPolygon(args) {
+    var i, j, len, ref, transform;
+    if (args.length > 0 && args.length % 2 === 1 && typeof args[args.length - 1] === "string") {
+      this.setColor(args[args.length - 1]);
+    }
+    if (Array.isArray(args[0])) {
+      if ((args[1] != null) && typeof args[1] === "string") {
+        this.setColor(args[1]);
+      }
+      args = args[0];
+    }
+    this.context.globalAlpha = this.alpha;
+    this.context.lineWidth = this.line_width;
+    if (args.length < 4) {
+      return;
+    }
+    len = Math.floor(args.length / 2);
+    transform = this.initDrawOp(0, 0, false);
+    this.context.beginPath();
+    this.context.moveTo(args[0], -args[1]);
+    for (i = j = 1, ref = len - 1; (1 <= ref ? j <= ref : j >= ref); i = 1 <= ref ? ++j : --j) {
+      this.context.lineTo(args[i * 2], -args[i * 2 + 1]);
+    }
+    this.context.fill();
+    if (transform) {
+      return this.closeDrawOp();
+    }
+  }
+
+  drawQuadCurve(args) {
+    var index, len, transform;
+    if (args.length > 0 && args.length % 2 === 1 && typeof args[args.length - 1] === "string") {
+      this.setColor(args[args.length - 1]);
+    }
+    if (Array.isArray(args[0])) {
+      if ((args[1] != null) && typeof args[1] === "string") {
+        this.setColor(args[1]);
+      }
+      args = args[0];
+    }
+    this.context.globalAlpha = this.alpha;
+    this.context.lineWidth = this.line_width;
+    if (args.length < 6) {
+      return;
+    }
+    len = Math.floor(args.length / 2);
+    transform = this.initDrawOp(0, 0, false);
+    this.context.beginPath();
+    this.context.moveTo(args[0], -args[1]);
+    for (index = 1; index < len; index++) {
+      this.context.quadraticCurveTo(args[index * 2], -args[index * 2 + 1], args[(index + 1) * 2], -args[(index + 1) * 2 + 1]);
+    }
+    this.context.stroke();
+    if (transform) {
+      return this.closeDrawOp();
+    }
+  }
+
+  drawBezierCurve(args) {
+    var index, len, transform;
+    if (args.length > 0 && args.length % 2 === 1 && typeof args[args.length - 1] === "string") {
+      this.setColor(args[args.length - 1]);
+    }
+    if (Array.isArray(args[0])) {
+      if ((args[1] != null) && typeof args[1] === "string") {
+        this.setColor(args[1]);
+      }
+      args = args[0];
+    }
+    this.context.globalAlpha = this.alpha;
+    this.context.lineWidth = this.line_width;
+    if (args.length < 8) {
+      return;
+    }
+    len = Math.floor(args.length / 2);
+    transform = this.initDrawOp(0, 0, false);
+    this.context.beginPath();
+    this.context.moveTo(args[0], -args[1]);
+    for (index = 1; index < len; index++) {
+      this.context.bezierCurveTo(args[index * 2], -args[index * 2 + 1], args[(index + 1) * 2], -args[(index + 1) * 2 + 1], args[(index + 2) * 2], -args[(index + 2) * 2 + 1]);
+    }
+    this.context.stroke();
+    if (transform) {
+      return this.closeDrawOp();
+    }
+  }
+
   textWidth(text, size) {
     this.context.font = `${size}pt ${this.font}`;
     return this.context.measureText(text).width;
@@ -615,6 +758,38 @@ this.Screen = class Screen {
       return this.closeDrawOp(x, -y);
     } else {
       return this.context.strokeText(text, x - this.anchor_x * w / 2, -y + this.anchor_y * h / 2);
+    }
+  }
+
+  drawArc(x, y, radius, angle1, angle2, ccw, color) {
+    this.setColor(color);
+    this.context.globalAlpha = this.alpha;
+    this.context.lineWidth = this.line_width;
+    if (this.initDrawOp(x, -y)) {
+      this.context.beginPath();
+      this.context.arc(0, 0, radius, -angle1 / 180 * Math.PI, -angle2 / 180 * Math.PI, ccw);
+      this.context.stroke();
+      return this.closeDrawOp(x, -y);
+    } else {
+      this.context.beginPath();
+      this.context.arc(x, -y, radius, -angle1 / 180 * Math.PI, -angle2 / 180 * Math.PI, ccw);
+      return this.context.stroke();
+    }
+  }
+
+  fillArc(x, y, radius, angle1, angle2, ccw, color) {
+    this.setColor(color);
+    this.context.globalAlpha = this.alpha;
+    this.context.lineWidth = this.line_width;
+    if (this.initDrawOp(x, -y)) {
+      this.context.beginPath();
+      this.context.arc(0, 0, radius, -angle1 / 180 * Math.PI, -angle2 / 180 * Math.PI, ccw);
+      this.context.fill();
+      return this.closeDrawOp(x, -y);
+    } else {
+      this.context.beginPath();
+      this.context.arc(x, -y, radius, -angle1 / 180 * Math.PI, -angle2 / 180 * Math.PI, ccw);
+      return this.context.fill();
     }
   }
 

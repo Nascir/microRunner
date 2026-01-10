@@ -1,5 +1,7 @@
 # microRunner
 
+> **Warning: This is an experimental version.** The software may contain bugs, breaking changes, or unexpected behavior. Use with caution and expect potential issues. Back up your projects regularly.
+
 Local microScript development environment with hot reload for microStudio games.
 
 ## Features

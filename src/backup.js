@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const AdmZip = require('adm-zip');
+const config = require('./config');
 
 const PROJECTS_DIR = path.join(__dirname, '../projects');
 const ARCHIVE_DIR = path.join(__dirname, '../archive');
@@ -14,21 +15,6 @@ function ensureArchiveDir() {
   }
 }
 
-function getProjectConfig(project) {
-  const configPath = path.join(PROJECTS_DIR, project, 'config.json');
-  if (fs.existsSync(configPath)) {
-    return JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-  }
-  return {
-    name: project,
-    slug: project,
-    graphics: 'm1',
-    orientation: 'any',
-    aspect: 'free',
-    public: true
-  };
-}
-
 function formatDate(timestamp) {
   const date = new Date(timestamp);
   return date.toISOString().split('T')[0].replace(/-/g, '');
@@ -37,63 +23,6 @@ function formatDate(timestamp) {
 function formatTime(timestamp) {
   const date = new Date(timestamp);
   return date.toTimeString().split(' ')[0].replace(/:/g, '');
-}
-
-function generateProjectJson(config, files, projectPath) {
-  const now = Date.now();
-  const msFiles = {};
-
-  for (const file of files.sources || []) {
-    msFiles[file.archivePath] = { properties: {}, version: 1, size: 0 };
-  }
-
-  let spriteProperties = {};
-
-  const projectJsonPath = path.join(projectPath, 'project.json');
-  if (fs.existsSync(projectJsonPath)) {
-    try {
-      const projectJson = JSON.parse(fs.readFileSync(projectJsonPath, 'utf-8'));
-      if (projectJson.files) {
-        for (const [entryPath, data] of Object.entries(projectJson.files)) {
-          if (entryPath.startsWith('sprites/') && data.properties) {
-            const fileName = entryPath.replace('sprites/', '');
-            spriteProperties[fileName] = data.properties;
-          }
-        }
-      }
-    } catch (e) {
-      console.warn('Failed to parse project.json for export', e);
-    }
-  }
-
-  for (const image of files.images || []) {
-    const archivePath = image.archivePath;
-    const fileName = archivePath.replace('sprites/', '');
-    const properties = spriteProperties[fileName] || { frames: 1, fps: 5 };
-    msFiles[archivePath] = { properties: properties, version: 1, size: 0 };
-  }
-
-  return {
-    owner: 'local',
-    title: config.name || config.slug,
-    slug: config.slug,
-    tags: [],
-    orientation: config.orientation || 'any',
-    aspect: config.aspect || 'free',
-    spriteDirection: config.spriteDirection || 'vertical',
-    platforms: ['computer', 'phone', 'tablet'],
-    controls: ['touch', 'mouse'],
-    type: 'app',
-    language: 'microscript_v2',
-    graphics: config.graphics?.toUpperCase() || 'M1',
-    networking: false,
-    libs: [],
-    date_created: config.date_created || now,
-    last_modified: now,
-    first_published: 0,
-    files: msFiles,
-    description: ''
-  };
 }
 
 function collectProjectFiles(project) {
@@ -216,7 +145,7 @@ function collectProjectFiles(project) {
   return files;
 }
 
-function createBackup(project, options = {}) {
+async function createBackup(project, options = {}) {
   return new Promise((resolve, reject) => {
     ensureArchiveDir();
 
@@ -235,47 +164,47 @@ function createBackup(project, options = {}) {
       fs.mkdirSync(backupDir, { recursive: true });
     }
 
-    const config = getProjectConfig(project);
-    const files = collectProjectFiles(project);
+    config.read(projectPath).then((projectConfig) => {
+      const files = collectProjectFiles(project);
+      const projectJson = config.toProjectJson(projectConfig);
 
-    const zip = new AdmZip();
+      const zip = new AdmZip();
+      zip.addFile('project.json', Buffer.from(JSON.stringify(projectJson, null, 2)));
 
-    const projectJson = generateProjectJson(config, files, projectPath);
-    zip.addFile('project.json', Buffer.from(JSON.stringify(projectJson, null, 2)));
+      for (const file of files.sources) {
+        zip.addFile(file.archivePath, file.content);
+      }
+      for (const file of files.images) {
+        zip.addFile(file.archivePath, file.content);
+      }
+      for (const file of files.maps) {
+        zip.addFile(file.archivePath, file.content);
+      }
+      for (const file of files.sounds) {
+        zip.addFile(file.archivePath, file.content);
+      }
+      for (const file of files.music) {
+        zip.addFile(file.archivePath, file.content);
+      }
+      for (const file of files.assets) {
+        zip.addFile(file.archivePath, file.content);
+      }
+      for (const file of files.docs) {
+        zip.addFile(file.archivePath, file.content);
+      }
 
-    for (const file of files.sources) {
-      zip.addFile(file.archivePath, file.content);
-    }
-    for (const file of files.images) {
-      zip.addFile(file.archivePath, file.content);
-    }
-    for (const file of files.maps) {
-      zip.addFile(file.archivePath, file.content);
-    }
-    for (const file of files.sounds) {
-      zip.addFile(file.archivePath, file.content);
-    }
-    for (const file of files.music) {
-      zip.addFile(file.archivePath, file.content);
-    }
-    for (const file of files.assets) {
-      zip.addFile(file.archivePath, file.content);
-    }
-    for (const file of files.docs) {
-      zip.addFile(file.archivePath, file.content);
-    }
+      zip.writeZip(backupPath);
 
-    zip.writeZip(backupPath);
-
-    resolve({
-      fileName: backupFileName,
-      fullPath: backupPath,
-      timestamp: Date.now()
-    });
+      resolve({
+        fileName: backupFileName,
+        fullPath: backupPath,
+        timestamp: Date.now()
+      });
+    }).catch(reject);
   });
 }
 
-function createExport(project) {
+async function createExport(project) {
   return new Promise((resolve, reject) => {
     const projectPath = path.join(PROJECTS_DIR, project);
     if (!fs.existsSync(projectPath)) {
@@ -286,42 +215,42 @@ function createExport(project) {
     const fileName = `${project}_${timestamp}_export.zip`;
     const exportPath = path.join(__dirname, '../../temp_' + fileName);
 
-    const config = getProjectConfig(project);
-    const files = collectProjectFiles(project);
+    config.read(projectPath).then(async (projectConfig) => {
+      const files = collectProjectFiles(project);
+      const projectJson = config.toProjectJson(projectConfig);
 
-    const zip = new AdmZip();
+      const zip = new AdmZip();
+      zip.addFile('project.json', Buffer.from(JSON.stringify(projectJson, null, 2)));
 
-    const projectJson = generateProjectJson(config, files, projectPath);
-    zip.addFile('project.json', Buffer.from(JSON.stringify(projectJson, null, 2)));
+      for (const file of files.sources) {
+        zip.addFile(file.archivePath, file.content);
+      }
+      for (const file of files.images) {
+        zip.addFile(file.archivePath, file.content);
+      }
+      for (const file of files.maps) {
+        zip.addFile(file.archivePath, file.content);
+      }
+      for (const file of files.sounds) {
+        zip.addFile(file.archivePath, file.content);
+      }
+      for (const file of files.music) {
+        zip.addFile(file.archivePath, file.content);
+      }
+      for (const file of files.assets) {
+        zip.addFile(file.archivePath, file.content);
+      }
+      for (const file of files.docs) {
+        zip.addFile(file.archivePath, file.content);
+      }
 
-    for (const file of files.sources) {
-      zip.addFile(file.archivePath, file.content);
-    }
-    for (const file of files.images) {
-      zip.addFile(file.archivePath, file.content);
-    }
-    for (const file of files.maps) {
-      zip.addFile(file.archivePath, file.content);
-    }
-    for (const file of files.sounds) {
-      zip.addFile(file.archivePath, file.content);
-    }
-    for (const file of files.music) {
-      zip.addFile(file.archivePath, file.content);
-    }
-    for (const file of files.assets) {
-      zip.addFile(file.archivePath, file.content);
-    }
-    for (const file of files.docs) {
-      zip.addFile(file.archivePath, file.content);
-    }
+      zip.writeZip(exportPath);
 
-    zip.writeZip(exportPath);
-
-    resolve({
-      fileName: fileName,
-      filePath: exportPath
-    });
+      resolve({
+        fileName: fileName,
+        filePath: exportPath
+      });
+    }).catch(reject);
   });
 }
 
@@ -412,7 +341,7 @@ function deleteBackupNote(project, backupFileName) {
   return false;
 }
 
-function restoreProjectFromUpload(project, zipPath, options = {}) {
+async function restoreProjectFromUpload(project, zipPath, options = {}) {
   try {
     ensureArchiveDir();
 
@@ -423,7 +352,7 @@ function restoreProjectFromUpload(project, zipPath, options = {}) {
     if (options.createPreRestoreBackup) {
       const projectPath = path.join(PROJECTS_DIR, project);
       if (fs.existsSync(projectPath)) {
-        createBackup(project, { suffix: 'pre_restore' });
+        await createBackup(project, { suffix: 'pre_restore' });
       }
     }
 
@@ -468,25 +397,19 @@ function restoreProjectFromUpload(project, zipPath, options = {}) {
       fs.writeFileSync(fullPath, entry.getData());
     }
 
-    const configPath = path.join(projectPath, 'config.json');
-    const config = getProjectConfig(project);
-    const newConfig = {
-      ...config,
-      name: projectJson.title,
-      slug: projectJson.slug,
-      orientation: projectJson.orientation,
-      aspect: projectJson.aspect,
-      graphics: projectJson.graphics?.toLowerCase(),
-      spriteDirection: projectJson.spriteDirection || 'vertical'
-    };
-    fs.writeFileSync(configPath, JSON.stringify(newConfig, null, 2));
-
-    const projectJsonPath = path.join(projectPath, 'project.json');
-    fs.writeFileSync(projectJsonPath, JSON.stringify(projectJson, null, 2));
+    const tomlConfig = config.fromProjectJson(projectJson);
+    await config.write(projectPath, tomlConfig);
 
     return {
       success: true,
-      config: newConfig
+      config: {
+        name: tomlConfig.meta.name,
+        slug: tomlConfig.meta.slug,
+        orientation: tomlConfig.settings.orientation,
+        aspect: tomlConfig.settings.aspect,
+        graphics: tomlConfig.settings.graphics,
+        spriteDirection: tomlConfig.sprites.direction
+      }
     };
   } catch (e) {
     throw e;
@@ -518,7 +441,7 @@ function uploadBackupToArchive(project, zipPath) {
   });
 }
 
-function restoreProject(project, backupFile, options = {}) {
+async function restoreProject(project, backupFile, options = {}) {
   try {
     ensureArchiveDir();
 
@@ -530,7 +453,7 @@ function restoreProject(project, backupFile, options = {}) {
     if (options.createPreRestoreBackup) {
       const projectPath = path.join(PROJECTS_DIR, project);
       if (fs.existsSync(projectPath)) {
-        createBackup(project, { suffix: 'pre_restore' });
+        await createBackup(project, { suffix: 'pre_restore' });
       }
     }
 
@@ -575,30 +498,26 @@ function restoreProject(project, backupFile, options = {}) {
       fs.writeFileSync(fullPath, entry.getData());
     }
 
-    const config = getProjectConfig(project);
-    const newConfig = {
-      ...config,
-      name: projectJson.title,
-      slug: projectJson.slug,
-      orientation: projectJson.orientation,
-      aspect: projectJson.aspect,
-      graphics: projectJson.graphics?.toLowerCase(),
-      spriteDirection: projectJson.spriteDirection || 'vertical'
-    };
-
-    const configPath = path.join(projectPath, 'config.json');
-    fs.writeFileSync(configPath, JSON.stringify(newConfig, null, 2));
+    const tomlConfig = config.fromProjectJson(projectJson);
+    await config.write(projectPath, tomlConfig);
 
     return {
       success: true,
-      config: newConfig
+      config: {
+        name: tomlConfig.meta.name,
+        slug: tomlConfig.meta.slug,
+        orientation: tomlConfig.settings.orientation,
+        aspect: tomlConfig.settings.aspect,
+        graphics: tomlConfig.settings.graphics,
+        spriteDirection: tomlConfig.sprites.direction
+      }
     };
   } catch (e) {
     throw e;
   }
 }
 
-function importProjectFromArchive(zipPath) {
+async function importProjectFromArchive(zipPath) {
   try {
     if (!fs.existsSync(zipPath)) {
       throw new Error('Uploaded file not found');
@@ -656,27 +575,13 @@ function importProjectFromArchive(zipPath) {
       fs.writeFileSync(fullPath, entry.getData());
     }
 
-    const config = {
-      name: projectJson.title,
-      slug: projectSlug,
-      orientation: projectJson.orientation || 'any',
-      aspect: projectJson.aspect || 'free',
-      graphics: projectJson.graphics?.toLowerCase() || 'm1',
-      spriteDirection: projectJson.spriteDirection || 'vertical',
-      public: true,
-      date_created: projectJson.date_created
-    };
-
-    const configPath = path.join(projectPath, 'config.json');
-    fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
-
-    const projectJsonPath = path.join(projectPath, 'project.json');
-    fs.writeFileSync(projectJsonPath, JSON.stringify(projectJson, null, 2));
+    const tomlConfig = config.fromProjectJson(projectJson);
+    await config.write(projectPath, tomlConfig);
 
     return {
       success: true,
       slug: projectSlug,
-      name: config.name,
+      name: tomlConfig.meta.name,
       warning: warning
     };
   } catch (e) {
@@ -684,14 +589,14 @@ function importProjectFromArchive(zipPath) {
   }
 }
 
-function duplicateProject(project) {
+async function duplicateProject(project) {
   const projectPath = path.join(PROJECTS_DIR, project);
   if (!fs.existsSync(projectPath)) {
     throw new Error('Project not found');
   }
 
-  const config = getProjectConfig(project);
-  const baseSlug = config.slug || project;
+  const projectConfig = await config.read(projectPath);
+  const baseSlug = projectConfig.meta.slug || project;
   let newSlug = `${baseSlug}-1`;
   let counter = 1;
 
@@ -703,20 +608,10 @@ function duplicateProject(project) {
   const newProjectPath = path.join(PROJECTS_DIR, newSlug);
   fs.cpSync(projectPath, newProjectPath, { recursive: true });
 
-  const newConfigPath = path.join(newProjectPath, 'config.json');
-  const newConfig = getProjectConfig(newSlug);
-  newConfig.name = `${config.name}-${counter}`;
-  newConfig.slug = newSlug;
-  fs.writeFileSync(newConfigPath, JSON.stringify(newConfig, null, 2));
-
-  const newProjectJsonPath = path.join(newProjectPath, 'project.json');
-  if (fs.existsSync(newProjectJsonPath)) {
-    const newProjectJson = JSON.parse(fs.readFileSync(newProjectJsonPath, 'utf-8'));
-    newProjectJson.title = newConfig.name;
-    newProjectJson.slug = newSlug;
-    newProjectJson.last_modified = Date.now();
-    fs.writeFileSync(newProjectJsonPath, JSON.stringify(newProjectJson, null, 2));
-  }
+  const newConfig = await config.read(newProjectPath);
+  newConfig.meta.name = `${projectConfig.meta.name}-${counter}`;
+  newConfig.meta.slug = newSlug;
+  await config.write(newProjectPath, newConfig);
 
   const sourceArchiveDir = path.join(ARCHIVE_DIR, project);
   const destArchiveDir = path.join(ARCHIVE_DIR, newSlug);
@@ -727,7 +622,7 @@ function duplicateProject(project) {
   return {
     success: true,
     slug: newSlug,
-    name: newConfig.name
+    name: newConfig.meta.name
   };
 }
 

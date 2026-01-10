@@ -1,7 +1,6 @@
 {
   "ignore": [
     "projects/**/*.json",
-    "sprites/**",
     "archive/**",
     "temp_*"
   ],

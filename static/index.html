@@ -139,8 +139,8 @@
                     <div class="form-group">
                         <label for="config-sprite-direction">Sprite Sheet Direction</label>
                         <select id="config-sprite-direction">
-                            <option value="vertical">VERTICAL - Frames top to bottom</option>
-                            <option value="horizontal">HORIZONTAL - Frames left to right</option>
+                            <option value="vertical">VERTICAL - Compatible with microStudio</option>
+                            <option value="horizontal">HORIZONTAL - Not compatible with microStudio</option>
                         </select>
                     </div>
                 </div>
@@ -295,8 +295,8 @@
                     <div class="form-group">
                         <label for="create-sprite-direction">Sprite Sheet Direction</label>
                         <select id="create-sprite-direction">
-                            <option value="vertical">VERTICAL - Frames top to bottom</option>
-                            <option value="horizontal">HORIZONTAL - Frames left to right</option>
+                            <option value="vertical">VERTICAL - Compatible with microStudio</option>
+                            <option value="horizontal">HORIZONTAL - Not compatible with microStudio</option>
                         </select>
                     </div>
                 </div>
@@ -329,7 +329,7 @@
                         <p style="margin: 4px 0; color: var(--color-accent); font-size: 20px;">↓</p>
                         <p id="update-latest-version">Latest version: <strong>-</strong></p>
                     </div>
-                    <div id="update-progress-section" style="display: none; margin-top: 20px;">
+                    <div id="update-progress-section" style="display: none; margin-top: 28px;">
                         <div id="update-progress-text" style="margin-bottom: 8px;">Preparing...</div>
                         <div class="progress-bar">
                             <div id="update-progress-fill" class="progress-fill" style="width: 0%;"></div>
@@ -1013,7 +1013,8 @@
                     <p style="margin: 0 0 8px 0; line-height: 1.6;">
                         <strong>To continue, run:</strong>
                     </p>
-                    <code style="display: block; background: var(--color-darkBg); padding: 12px; border-radius: 4px; margin-bottom: 12px;">npm install&#10;npm start</code>
+                    <code style="display: block; background: var(--color-darkBg); padding: 12px; border-radius: 4px; margin-bottom: 12px; white-space: pre;">npm install
+npm start</code>
                     <p style="margin: 0; font-size: 12px; color: var(--color-textSecondary);">
                         <i class="fa fa-folder-open"></i> Your projects and backups are preserved.
                     </p>

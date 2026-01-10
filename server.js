@@ -5,6 +5,7 @@ const path = require("path");
 const fs = require("fs");
 const chokidar = require("chokidar");
 const backup = require("./src/backup.js");
+const config = require("./src/config.js");
 
 const PORT = process.env.PORT || 3000;
 const PROJECTS_DIR = path.join(__dirname, "projects");
@@ -18,6 +19,7 @@ app.use(require("express-fileupload")());
 app.use(express.static(path.join(__dirname, "static")));
 
 const projectClients = new Map();
+const projectSpriteWatchers = new Map();
 
 function ensureProjectsDir() {
   if (!fs.existsSync(PROJECTS_DIR)) {
@@ -25,21 +27,59 @@ function ensureProjectsDir() {
   }
 }
 
+function ensureProjectStructure(projectPath, projectName, options = {}) {
+  fs.mkdirSync(path.join(projectPath, "ms"), { recursive: true });
+  fs.mkdirSync(path.join(projectPath, "sprites"), { recursive: true });
+
+  const defaultIconPath = path.join(__dirname, "static", "icon.png");
+  if (fs.existsSync(defaultIconPath)) {
+    fs.copyFileSync(
+      defaultIconPath,
+      path.join(projectPath, "sprites", "icon.png"),
+    );
+  }
+
+  const mainMsPath = path.join(projectPath, "ms", "main.ms");
+  if (!fs.existsSync(mainMsPath)) {
+    const mainMs = `init = function()
+end
+
+update = function()
+end
+
+draw = function()
+  screen.clear()
+  screen.drawText("Hello, World!", 0, 0, 12, "white")
+end
+`;
+    fs.writeFileSync(mainMsPath, mainMs);
+  }
+
+  if (options.createConfig !== false) {
+    const projectConfig = config.createConfig(options.name || projectName, path.basename(projectPath), {
+      orientation: options.orientation || "any",
+      aspect: options.aspect || "free",
+      spriteDirection: options.spriteDirection || "vertical",
+      spriteFrames: { "icon.png": 1 }
+    });
+    config.write(projectPath, projectConfig);
+  }
+}
+
 function createDemoProject() {
-  const demoDir = path.join(PROJECTS_DIR, "demo", "ms");
-  const spritesDir = path.join(PROJECTS_DIR, "demo", "sprites");
+  const demoPath = path.join(PROJECTS_DIR, "demo");
 
-  if (!fs.existsSync(demoDir)) {
-    fs.mkdirSync(demoDir, { recursive: true });
-  }
-  if (!fs.existsSync(spritesDir)) {
-    fs.mkdirSync(spritesDir, { recursive: true });
+  if (!fs.existsSync(demoPath)) {
+    fs.mkdirSync(demoPath, { recursive: true });
   }
 
-  const mainMs = path.join(demoDir, "main.ms");
-  if (!fs.existsSync(mainMs)) {
+  const mainMsPath = path.join(demoPath, "ms", "main.ms");
+  if (!fs.existsSync(mainMsPath)) {
+    fs.mkdirSync(path.join(demoPath, "ms"), { recursive: true });
+    fs.mkdirSync(path.join(demoPath, "sprites"), { recursive: true });
+
     fs.writeFileSync(
-      mainMs,
+      mainMsPath,
       `init = function()
 end
 
@@ -52,23 +92,69 @@ end
     );
   }
 
-  const configPath = path.join(PROJECTS_DIR, "demo", "config.json");
-  if (!fs.existsSync(configPath)) {
-    fs.writeFileSync(
-      configPath,
-      JSON.stringify(
-        {
-          name: "Demo Project",
-          slug: "demo",
-          graphics: "m1",
-          orientation: "any",
-          aspect: "free",
-          public: true,
-        },
-        null,
-        2,
-      ),
-    );
+  const tomlPath = path.join(demoPath, "project.toml");
+  if (!fs.existsSync(tomlPath)) {
+    const demoConfig = config.createConfig("Demo Project", "demo", {});
+    config.write(demoPath, demoConfig);
+  }
+}
+
+async function migrateProjectToToml(projectName) {
+  const projectPath = path.join(PROJECTS_DIR, projectName);
+  const tomlPath = path.join(projectPath, "project.toml");
+
+  if (fs.existsSync(tomlPath)) {
+    return;
+  }
+
+  const projectJsonPath = path.join(projectPath, "project.json");
+  const configJsonPath = path.join(projectPath, "config.json");
+
+  let legacyConfig = null;
+
+  if (fs.existsSync(projectJsonPath)) {
+    try {
+      const projectJson = JSON.parse(fs.readFileSync(projectJsonPath, "utf-8"));
+      legacyConfig = config.fromProjectJson(projectJson);
+      console.log(`[Server] Migrated project.json to TOML for ${projectName}`);
+    } catch (e) {
+      console.warn(`[Server] Failed to parse project.json for ${projectName}:`, e.message);
+    }
+  } else if (fs.existsSync(configJsonPath)) {
+    try {
+      const configJson = JSON.parse(fs.readFileSync(configJsonPath, "utf-8"));
+      legacyConfig = config.createConfig(configJson.name || projectName, projectName, {
+        orientation: configJson.orientation || "any",
+        aspect: configJson.aspect || "free",
+        graphics: configJson.graphics || "m1",
+        spriteDirection: configJson.spriteDirection || "vertical"
+      });
+      console.log(`[Server] Migrated config.json to TOML for ${projectName}`);
+    } catch (e) {
+      console.warn(`[Server] Failed to parse config.json for ${projectName}:`, e.message);
+    }
+  }
+
+  if (legacyConfig) {
+    await config.write(projectPath, legacyConfig);
+  } else {
+    ensureProjectStructure(projectPath, projectName, { createConfig: false });
+    const defaultConfig = config.createConfig(projectName, projectName, {});
+    await config.write(projectPath, defaultConfig);
+    console.log(`[Server] Utworzono domyślne pliki projektu: ${projectName}`);
+  }
+}
+
+async function migrateAllProjects() {
+  if (!fs.existsSync(PROJECTS_DIR)) {
+    return;
+  }
+
+  const entries = fs.readdirSync(PROJECTS_DIR, { withFileTypes: true });
+  for (const entry of entries) {
+    if (entry.isDirectory()) {
+      await migrateProjectToToml(entry.name);
+    }
   }
 }
 
@@ -111,7 +197,7 @@ function validatePath(project, subdir, userPath) {
   return resolved;
 }
 
-function getProjects() {
+async function getProjects() {
   if (!fs.existsSync(PROJECTS_DIR)) return [];
 
   const projects = [];
@@ -119,48 +205,46 @@ function getProjects() {
 
   for (const entry of entries) {
     if (entry.isDirectory()) {
-      const configPath = path.join(PROJECTS_DIR, entry.name, "config.json");
-      let config = {
-        name: entry.name,
-        slug: entry.name,
-        projectPath: "~/projects/" + entry.name + "/",
-      };
-      if (fs.existsSync(configPath)) {
-        try {
-          config = JSON.parse(fs.readFileSync(configPath, "utf-8"));
-          config.projectPath = "~/projects/" + entry.name + "/";
-        } catch (e) {
-          console.warn(`Invalid config.json for ${entry.name}:`, e.message);
-        }
+      const projectPath = path.join(PROJECTS_DIR, entry.name);
+      let projectConfig;
+
+      try {
+        projectConfig = await config.read(projectPath);
+      } catch (e) {
+        console.warn(`Failed to read project.toml for ${entry.name}:`, e.message);
+        continue;
       }
-      config.lastUpdated = getProjectLastUpdated(entry.name);
-      projects.push(config);
+
+      const projectData = {
+        name: projectConfig.meta.name,
+        slug: projectConfig.meta.slug,
+        orientation: projectConfig.settings.orientation,
+        aspect: projectConfig.settings.aspect,
+        projectPath: "~/projects/" + entry.name + "/",
+        lastUpdated: getProjectLastUpdated(entry.name),
+      };
+      projects.push(projectData);
     }
   }
   return projects;
 }
 
-function getProjectFiles(project) {
+async function getProjectFiles(project) {
   const projectPath = path.join(PROJECTS_DIR, project);
-  const msDir = path.join(projectPath, "ms");
-  if (!fs.existsSync(msDir))
-    return {
-      sources: [],
-      images: [],
-      maps: [],
-      sounds: [],
-      music: [],
-      assets: [],
-    };
 
+  const msDir = path.join(projectPath, "ms");
   const sources = [];
-  const files = fs.readdirSync(msDir, { recursive: true });
-  for (const file of files) {
-    if (file.endsWith(".ms")) {
-      sources.push({
-        file: file,
-        version: Date.now(),
-      });
+  if (fs.existsSync(msDir)) {
+    const msFiles = fs.readdirSync(msDir, { recursive: true });
+    for (const file of msFiles) {
+      if (file.endsWith(".ms")) {
+        const name = file.replace(".ms", "").replace(/\//g, "-");
+        sources.push({
+          file: file,
+          name: name,
+          version: Date.now(),
+        });
+      }
     }
   }
 
@@ -171,68 +255,59 @@ function getProjectFiles(project) {
 
     let spriteProperties = {};
 
-    const projectJsonPath = path.join(projectPath, "project.json");
-    if (fs.existsSync(projectJsonPath)) {
-      try {
-        const projectJson = JSON.parse(
-          fs.readFileSync(projectJsonPath, "utf-8"),
-        );
-        if (projectJson.files) {
-          for (const [entryPath, data] of Object.entries(projectJson.files)) {
-            if (entryPath.startsWith("sprites/") && data.properties) {
-              const fileName = entryPath.replace("sprites/", "");
-              spriteProperties[fileName] = data.properties;
-            }
-          }
+    try {
+      const projectConfig = await config.read(projectPath);
+      const spriteDirection = projectConfig.sprites?.direction || "vertical";
+
+      for (const [key, value] of Object.entries(projectConfig.sprites || {})) {
+        if (key !== "direction") {
+          spriteProperties[key] = { frames: value.frames, fps: 5 };
         }
-      } catch (e) {
-        console.warn("Failed to parse project.json for", project, e);
       }
-    }
 
-    const config = getProjectConfig(project);
-    const spriteDirection = config.spriteDirection || "vertical";
+      for (const file of spriteFiles) {
+        if (file.match(/\.(png|jpg|jpeg|gif)$/i)) {
+          const name = file
+            .replace(/\.(png|jpg|jpeg|gif)$/i, "")
+            .replace(/\//g, "-");
+          const imageObj = {
+            file: name + ".png",
+            version: Date.now(),
+          };
 
-    for (const file of spriteFiles) {
-      if (file.match(/\.(png|jpg|jpeg|gif)$/i)) {
-        const name = file
-          .replace(/\.(png|jpg|jpeg|gif)$/i, "")
-          .replace(/\//g, "-");
-        const imageObj = {
-          file: name + ".png",
-          version: Date.now(),
-        };
+          if (spriteProperties[file]) {
+            imageObj.properties = spriteProperties[file];
+          } else {
+            const pngPath = path.join(spritesDir, file);
+            if (fs.existsSync(pngPath)) {
+              try {
+                const buffer = fs.readFileSync(pngPath);
+                if (buffer.length >= 24) {
+                  const width = buffer.readUInt32BE(16);
+                  const height = buffer.readUInt32BE(20);
+                  let frames = 1;
 
-        if (spriteProperties[file]) {
-          imageObj.properties = spriteProperties[file];
-        } else {
-          const pngPath = path.join(spritesDir, file);
-          if (fs.existsSync(pngPath)) {
-            try {
-              const buffer = fs.readFileSync(pngPath);
-              if (buffer.length >= 24) {
-                const width = buffer.readUInt32BE(16);
-                const height = buffer.readUInt32BE(20);
-                let frames = 1;
+                  if (spriteDirection === "horizontal") {
+                    frames = Math.max(1, Math.round(width / height));
+                  } else {
+                    frames = Math.max(1, Math.round(height / width));
+                  }
 
-                if (spriteDirection === "horizontal") {
-                  frames = Math.max(1, Math.round(width / height));
-                } else {
-                  frames = Math.max(1, Math.round(height / width));
+                  imageObj.properties = { frames: frames, fps: 5 };
                 }
-
-                imageObj.properties = { frames: frames, fps: 5 };
+              } catch (err) {
+                imageObj.properties = { frames: 1, fps: 5 };
               }
-            } catch (err) {
+            } else {
               imageObj.properties = { frames: 1, fps: 5 };
             }
-          } else {
-            imageObj.properties = { frames: 1, fps: 5 };
           }
-        }
 
-        images.push(imageObj);
+          images.push(imageObj);
+        }
       }
+    } catch (e) {
+      console.warn("Failed to read project.toml for", project, e.message);
     }
   }
 
@@ -303,241 +378,11 @@ function getProjectFiles(project) {
   return { sources, images, maps, sounds, music, assets };
 }
 
-function getProjectConfig(project) {
-  const projectPath = path.join(PROJECTS_DIR, project);
-  const projectJsonPath = path.join(projectPath, "project.json");
-  const configPath = path.join(projectPath, "config.json");
-
-  if (fs.existsSync(projectJsonPath)) {
-    try {
-      const projectJson = JSON.parse(fs.readFileSync(projectJsonPath, "utf-8"));
-      return {
-        name: projectJson.title,
-        slug: projectJson.slug,
-        orientation: projectJson.orientation,
-        aspect: projectJson.aspect,
-        graphics: projectJson.graphics?.toLowerCase() || "m1",
-        spriteDirection: projectJson.spriteDirection || "vertical",
-        public: true,
-      };
-    } catch (e) {
-      console.warn("Failed to parse project.json for", project, e);
-    }
-  }
-
-  if (fs.existsSync(configPath)) {
-    return JSON.parse(fs.readFileSync(configPath, "utf-8"));
-  }
-
-  return {
-    name: project,
-    slug: project,
-    graphics: "m1",
-    orientation: "any",
-    aspect: "free",
-    spriteDirection: "vertical",
-    public: true,
-  };
-}
-
-function handleSpriteChange(project, fileName) {
-  const projectPath = path.join(PROJECTS_DIR, project);
-  const spritePath = path.join(projectPath, "sprites", fileName);
-
-  if (!fs.existsSync(spritePath)) {
-    return;
-  }
-
-  let width = 1;
-  let height = 1;
-
-  try {
-    const buffer = fs.readFileSync(spritePath);
-    if (buffer.length >= 24) {
-      width = buffer.readUInt32BE(16);
-      height = buffer.readUInt32BE(20);
-    }
-  } catch (e) {
-    console.warn(`[Server] Failed to read sprite dimensions: ${fileName}`, e);
-  }
-
-  const config = getProjectConfig(project);
-  const spriteDirection = config.spriteDirection || "vertical";
-
-  let frames = 1;
-  if (spriteDirection === "horizontal") {
-    frames = Math.max(1, Math.round(width / height));
-  } else {
-    frames = Math.max(1, Math.round(height / width));
-  }
-
-  const projectJsonPath = path.join(projectPath, "project.json");
-  let projectJson = {
-    owner: "local",
-    title: config.name,
-    slug: config.slug,
-    tags: [],
-    orientation: config.orientation,
-    aspect: config.aspect,
-    spriteDirection: spriteDirection,
-    platforms: ["computer", "phone", "tablet"],
-    controls: ["touch", "mouse"],
-    type: "app",
-    language: "microscript_v2",
-    graphics: "M1",
-    networking: false,
-    libs: [],
-    date_created: Date.now(),
-    last_modified: Date.now(),
-    first_published: 0,
-    files: {},
-    description: "",
-  };
-
-  if (fs.existsSync(projectJsonPath)) {
-    try {
-      projectJson = JSON.parse(fs.readFileSync(projectJsonPath, "utf-8"));
-      if (!projectJson.files) {
-        projectJson.files = {};
-      }
-    } catch (e) {
-      console.warn(
-        `[Server] Failed to parse project.json for ${project}, creating new one`,
-      );
-    }
-  }
-
-  const spriteEntry = `sprites/${fileName}`;
-  const existingProps = projectJson.files?.[spriteEntry]?.properties;
-  const existingFrames = existingProps?.frames;
-
-  const needsUpdate = !existingProps || existingFrames !== frames;
-
-  if (!needsUpdate) {
-    return;
-  }
-
-  projectJson.files[spriteEntry] = {
-    properties: {
-      frames: frames,
-    },
-  };
-
-  projectJson.last_modified = Date.now();
-
-  fs.writeFileSync(projectJsonPath, JSON.stringify(projectJson, null, 2));
-
-  console.log(`[Server] Sprite updated: ${fileName} -> ${frames} frame(s)`);
-
-  broadcastToAllProjects();
-}
-
-function scanProjectSprites(project) {
-  const projectPath = path.join(PROJECTS_DIR, project);
-  const spritesDir = path.join(projectPath, "sprites");
-
-  if (!fs.existsSync(spritesDir)) return 0;
-
-  const files = fs.readdirSync(spritesDir);
-  const imageFiles = files.filter((f) => f.match(/\.(png|jpg|jpeg|gif)$/i));
-
-  if (imageFiles.length === 0) return 0;
-
-  const config = getProjectConfig(project);
-  const spriteDirection = config.spriteDirection || "vertical";
-  const projectJsonPath = path.join(projectPath, "project.json");
-
-  let projectJson = {
-    owner: "local",
-    title: config.name,
-    slug: config.slug,
-    tags: [],
-    orientation: config.orientation,
-    aspect: config.aspect,
-    spriteDirection: spriteDirection,
-    platforms: ["computer", "phone", "tablet"],
-    controls: ["touch", "mouse"],
-    type: "app",
-    language: "microscript_v2",
-    graphics: "M1",
-    networking: false,
-    libs: [],
-    date_created: Date.now(),
-    last_modified: Date.now(),
-    first_published: 0,
-    files: {},
-    description: "",
-  };
-
-  if (fs.existsSync(projectJsonPath)) {
-    try {
-      projectJson = JSON.parse(fs.readFileSync(projectJsonPath, "utf-8"));
-      if (!projectJson.files) {
-        projectJson.files = {};
-      }
-    } catch (e) {
-      console.warn(
-        `[Server] Failed to parse project.json for ${project}, creating new one`,
-      );
-    }
-  }
-
-  let updated = false;
-
-  for (const fileName of imageFiles) {
-    const spritePath = path.join(spritesDir, fileName);
-    const spriteEntry = `sprites/${fileName}`;
-
-    let width = 1;
-    let height = 1;
-
-    try {
-      const buffer = fs.readFileSync(spritePath);
-      if (buffer.length >= 24) {
-        width = buffer.readUInt32BE(16);
-        height = buffer.readUInt32BE(20);
-      }
-    } catch (e) {
-      console.warn(`[Server] Failed to read sprite dimensions: ${fileName}`, e);
-    }
-
-    let frames = 1;
-    if (spriteDirection === "horizontal") {
-      frames = Math.max(1, Math.round(width / height));
-    } else {
-      frames = Math.max(1, Math.round(height / width));
-    }
-
-    const existingProps = projectJson.files?.[spriteEntry]?.properties;
-    const existingFrames = existingProps?.frames;
-
-    if (!existingProps || existingFrames !== frames) {
-      projectJson.files[spriteEntry] = {
-        properties: {
-          frames: frames,
-        },
-      };
-      updated = true;
-    }
-  }
-
-  if (updated) {
-    projectJson.last_modified = Date.now();
-    fs.writeFileSync(projectJsonPath, JSON.stringify(projectJson, null, 2));
-    console.log(
-      `[Server] Scanned ${imageFiles.length} sprite(s) for ${project}`,
-    );
-  }
-
-  return imageFiles.length;
-}
-
 function watchProject(project) {
   if (projectClients.has(project)) return;
 
   const projectPath = path.join(PROJECTS_DIR, project);
   const msDir = path.join(projectPath, "ms");
-  const spritesDir = path.join(projectPath, "sprites");
 
   if (!fs.existsSync(msDir)) return;
 
@@ -546,7 +391,7 @@ function watchProject(project) {
     persistent: true,
   });
 
-  watcher.on("change", (filePath) => {
+  watcher.on("change", async (filePath) => {
     const fileName = path.basename(filePath);
     const content = fs.readFileSync(filePath, "utf-8");
 
@@ -557,31 +402,51 @@ function watchProject(project) {
       version: Date.now(),
     });
 
+    await config.touch(projectPath);
     broadcastToAllProjects();
   });
 
-  if (fs.existsSync(spritesDir)) {
-    const spriteWatcher = chokidar.watch(spritesDir, {
-      ignored: /^\./,
-      persistent: true,
-    });
-
-    spriteWatcher.on("add", (filePath) => {
-      const fileName = path.basename(filePath);
-      if (fileName.match(/\.(png|jpg|jpeg|gif)$/i)) {
-        handleSpriteChange(project, fileName);
-      }
-    });
-
-    spriteWatcher.on("change", (filePath) => {
-      const fileName = path.basename(filePath);
-      if (fileName.match(/\.(png|jpg|jpeg|gif)$/i)) {
-        handleSpriteChange(project, fileName);
-      }
-    });
-  }
-
   projectClients.set(project, watcher);
+  watchSprites(project);
+}
+
+async function handleSpriteChange(project, event, filePath) {
+  const projectPath = path.join(PROJECTS_DIR, project);
+  const fileName = path.basename(filePath);
+
+  try {
+    await config.syncSprites(projectPath);
+    const spriteProps = config.getSpriteProperties(fileName, projectPath);
+
+    broadcastToProject(project, {
+      type: "sprites",
+      file: fileName.replace(/\.(png|jpg|jpeg|gif)$/i, ""),
+      version: Date.now(),
+      properties: spriteProps || { frames: 1 },
+    });
+  } catch (e) {
+    console.error(`[Server] Error handling sprite change for ${project}:`, e);
+  }
+}
+
+function watchSprites(project) {
+  if (projectSpriteWatchers.has(project)) return;
+
+  const projectPath = path.join(PROJECTS_DIR, project);
+  const spritesDir = path.join(projectPath, "sprites");
+
+  if (!fs.existsSync(spritesDir)) return;
+
+  const watcher = chokidar.watch(spritesDir, {
+    ignored: /^\./,
+    persistent: true,
+  });
+
+  watcher.on("add", (filePath) => handleSpriteChange(project, "add", filePath));
+  watcher.on("unlink", (filePath) => handleSpriteChange(project, "unlink", filePath));
+  watcher.on("change", (filePath) => handleSpriteChange(project, "change", filePath));
+
+  projectSpriteWatchers.set(project, watcher);
 }
 
 function watchAllProjects() {
@@ -591,7 +456,6 @@ function watchAllProjects() {
   for (const entry of entries) {
     if (entry.isDirectory()) {
       watchProject(entry.name);
-      scanProjectSprites(entry.name);
     }
   }
 }
@@ -635,15 +499,32 @@ app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "static", "index.html"));
 });
 
-app.get("/api/projects", (req, res) => {
-  res.json(getProjects());
+app.get("/api/projects", async (req, res) => {
+  const projects = await getProjects();
+  res.json(projects);
 });
 
-app.get("/api/project/:name", (req, res) => {
+app.get("/api/project/:name", async (req, res) => {
   const project = req.params.name;
-  const config = getProjectConfig(project);
-  const files = getProjectFiles(project);
-  res.json({ ...config, files });
+  const projectPath = path.join(PROJECTS_DIR, project);
+
+  let projectConfig;
+  try {
+    projectConfig = await config.read(projectPath);
+  } catch (e) {
+    return res.status(404).json({ error: "Project not found" });
+  }
+
+  const files = await getProjectFiles(project);
+  const configData = {
+    name: projectConfig.meta.name,
+    slug: projectConfig.meta.slug,
+    orientation: projectConfig.settings.orientation,
+    aspect: projectConfig.settings.aspect,
+    graphics: projectConfig.settings.graphics,
+    spriteDirection: projectConfig.sprites.direction
+  };
+  res.json({ ...configData, files });
 });
 
 app.get("/api/file/:project/*", (req, res) => {
@@ -661,12 +542,14 @@ app.get("/api/file/:project/*", (req, res) => {
   }
 });
 
-app.put("/api/project/:name/config", (req, res) => {
+app.put("/api/project/:name/config", async (req, res) => {
   const { name } = req.params;
   const newConfig = req.body;
 
-  const oldConfigPath = path.join(PROJECTS_DIR, name, "config.json");
-  if (!fs.existsSync(oldConfigPath)) {
+  const projectPath = path.join(PROJECTS_DIR, name);
+  const tomlPath = path.join(projectPath, "project.toml");
+
+  if (!fs.existsSync(tomlPath)) {
     return res.status(404).json({ error: "Project not found" });
   }
 
@@ -685,27 +568,16 @@ app.put("/api/project/:name/config", (req, res) => {
       fs.renameSync(oldProjectPath, newProjectPath);
     }
 
-    const configPath = path.join(PROJECTS_DIR, newSlug, "config.json");
-    const config = JSON.parse(fs.readFileSync(configPath, "utf-8"));
-    config.name = newConfig.name;
-    config.slug = newConfig.slug;
-    config.orientation = newConfig.orientation;
-    config.aspect = newConfig.aspect;
-    config.spriteDirection = newConfig.spriteDirection;
-    fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+    const projectConfig = await config.read(path.join(PROJECTS_DIR, newSlug));
+    projectConfig.meta.name = newConfig.name;
+    projectConfig.meta.slug = newConfig.slug;
+    projectConfig.settings.orientation = newConfig.orientation;
+    projectConfig.settings.aspect = newConfig.aspect;
+    projectConfig.settings.graphics = newConfig.graphics;
+    projectConfig.sprites.direction = newConfig.spriteDirection;
+    projectConfig.meta.lastModified = new Date().toISOString().slice(0, 19) + 'Z';
 
-    const projectJsonPath = path.join(PROJECTS_DIR, newSlug, "project.json");
-    if (fs.existsSync(projectJsonPath)) {
-      const projectJson = JSON.parse(fs.readFileSync(projectJsonPath, "utf-8"));
-      projectJson.title = newConfig.name;
-      projectJson.slug = newConfig.slug;
-      projectJson.orientation = newConfig.orientation;
-      projectJson.aspect = newConfig.aspect;
-      projectJson.graphics = newConfig.graphics?.toUpperCase();
-      projectJson.spriteDirection = newConfig.spriteDirection;
-      projectJson.last_modified = Date.now();
-      fs.writeFileSync(projectJsonPath, JSON.stringify(projectJson, null, 2));
-    }
+    await config.write(path.join(PROJECTS_DIR, newSlug), projectConfig);
 
     res.json({ success: true, slug: newSlug });
   } catch (e) {
@@ -737,71 +609,13 @@ app.post("/api/projects", (req, res) => {
 
   try {
     const projectPath = path.join(PROJECTS_DIR, projectSlug);
-    fs.mkdirSync(path.join(projectPath, "ms"), { recursive: true });
-    fs.mkdirSync(path.join(projectPath, "sprites"), { recursive: true });
-    const defaultIconPath = path.join(__dirname, "static", "icon.png");
-    if (fs.existsSync(defaultIconPath)) {
-      fs.copyFileSync(
-        defaultIconPath,
-        path.join(projectPath, "sprites", "icon.png"),
-      );
-    }
 
-    const mainMs = `init = function()
-  // Initialize your game here
-end
-
-update = function()
-  // Update game logic (60 FPS)
-end
-
-draw = function()
-  // Draw to screen
-  screen.clear()
-  screen.drawText("Hello, World!", 0, 0, 12, "white")
-end
-`;
-    fs.writeFileSync(path.join(projectPath, "ms", "main.ms"), mainMs);
-
-    const config = {
+    ensureProjectStructure(projectPath, projectSlug, {
       name: name,
-      slug: projectSlug,
-      graphics: "m1",
       orientation: orientation || "any",
       aspect: aspect || "free",
-      spriteDirection: spriteDirection || "vertical",
-      public: true,
-    };
-    fs.writeFileSync(
-      path.join(projectPath, "config.json"),
-      JSON.stringify(config, null, 2),
-    );
-
-    const projectJson = {
-      owner: "local",
-      title: name,
-      slug: projectSlug,
-      tags: [],
-      orientation: orientation || "any",
-      aspect: aspect || "free",
-      spriteDirection: spriteDirection || "vertical",
-      platforms: ["computer", "phone", "tablet"],
-      controls: ["touch", "mouse"],
-      type: "app",
-      language: "microscript_v2",
-      graphics: "M1",
-      networking: false,
-      libs: [],
-      date_created: Date.now(),
-      last_modified: Date.now(),
-      first_published: 0,
-      files: {},
-      description: "",
-    };
-    fs.writeFileSync(
-      path.join(projectPath, "project.json"),
-      JSON.stringify(projectJson, null, 2),
-    );
+      spriteDirection: spriteDirection || "vertical"
+    });
 
     res.json({ success: true, slug: projectSlug });
   } catch (e) {
@@ -828,7 +642,7 @@ app.delete("/api/project/:name", (req, res) => {
   }
 });
 
-app.post("/api/project/:name/duplicate", (req, res) => {
+app.post("/api/project/:name/duplicate", async (req, res) => {
   const { name } = req.params;
   const projectPath = path.join(PROJECTS_DIR, name);
 
@@ -837,7 +651,7 @@ app.post("/api/project/:name/duplicate", (req, res) => {
   }
 
   try {
-    const result = backup.duplicateProject(name);
+    const result = await backup.duplicateProject(name);
     res.json(result);
   } catch (e) {
     console.error("Failed to duplicate project:", e);
@@ -1402,7 +1216,9 @@ app.get("/api/update/download", async (req, res) => {
 ensureProjectsDir();
 backup.ensureArchiveDir();
 createDemoProject();
-watchAllProjects();
+migrateAllProjects().then(() => {
+  watchAllProjects();
+});
 
 server.listen(PORT, () => {
   console.log(`🟢 microRunner running at http://localhost:${PORT}`);

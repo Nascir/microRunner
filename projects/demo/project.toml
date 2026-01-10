@@ -1,0 +1,19 @@
+microrunnerVersion = "0.1.0"
+
+[meta]
+name = "demo"
+slug = "demo"
+created = "2026-01-10T14:19:18Z"
+lastModified = "2026-01-10T14:53:03Z"
+
+[settings]
+graphics = "m1"
+orientation = "any"
+aspect = "free"
+language = "microscript_v2"
+
+[sprites]
+direction = "vertical"
+
+[sprites."icon.png"]
+frames = 1

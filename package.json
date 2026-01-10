@@ -1,6 +1,6 @@
 {
   "name": "microrunner",
-  "version": "26.1.10",
+  "version": "0.1.0",
   "description": "Local microScript development environment",
   "main": "server.js",
   "scripts": {
@@ -19,6 +19,7 @@
     "chokidar": "^3.5.3",
     "express": "^4.18.2",
     "express-fileupload": "^1.4.3",
+    "smol-toml": "^1.6.0",
     "ws": "^8.14.2"
   },
   "devDependencies": {
