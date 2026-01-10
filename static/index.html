@@ -879,7 +879,7 @@
                     const res = await fetch('/api/version');
                     const data = await res.json();
 
-                    document.getElementById('version-badge').textContent = 'v' + data.current;
+                    document.getElementById('version-badge').textContent = 'version ' + data.current;
 
                     if (data.hasUpdate) {
                         btn.style.display = 'inline-flex';
@@ -918,9 +918,9 @@
             function showUpdateInfo() {
                 document.getElementById('update-modal-title').innerHTML = '<i class="fa fa-rocket"></i> Update Available';
                 document.getElementById('update-current-version').innerHTML =
-                    'Current version: <strong>v' + updateData.current + '</strong>';
+                    'Current version: <strong>version ' + updateData.current + '</strong>';
                 document.getElementById('update-latest-version').innerHTML =
-                    'Latest version: <strong class="accent">v' + updateData.latest + '</strong>';
+                    'Latest version: <strong class="accent">version ' + updateData.latest + '</strong>';
 
                 document.getElementById('update-progress-section').style.display = 'none';
                 document.getElementById('update-instructions-waiting').style.display = 'block';
