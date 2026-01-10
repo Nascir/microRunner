@@ -27,11 +27,14 @@ Open http://localhost:3000
 
 ## Sprite Animation
 
-Configure animated sprites (sprite sheets) per project:
+Configure animated sprites (sprite sheets) per project in `project.toml`:
 
-**Sprite Sheet Direction** - how frames are arranged (in `config.json`):
-- `spriteDirection: "vertical"` (default) - frames stacked vertically
-- `spriteDirection: "horizontal"` - frames stacked horizontally
+**Sprite Sheet Direction** - how frames are arranged:
+```toml
+[sprites]
+direction = "vertical"  # default - frames stacked vertically
+# direction = "horizontal"  # frames stacked horizontally
+```
 
 **Auto-detection of frames:**
 - Vertical: `frames = height / width` (e.g., 64×128 = 2 frames)
@@ -48,17 +51,10 @@ init = function()
 end
 ```
 
-**Project JSON format (frames only, fps controlled in code):**
-```
-{
-  "files": {
-    "sprites/sprite.png": {
-      "properties": {
-        "frames": 4
-      }
-    }
-  }
-}
+**Sprite frames configuration:**
+```toml
+[sprites."sprite.png"]
+frames = 4  # number of animation frames
 ```
 
 **Import:** Sprite properties preserved when importing from microStudio ZIP

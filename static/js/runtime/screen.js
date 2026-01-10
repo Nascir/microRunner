@@ -225,23 +225,17 @@ this.Screen = class Screen {
       drawArc: function(x, y, radius, angle1, angle2, ccw, color) {
         return screen.drawArc(x, y, radius, angle1, angle2, ccw, color);
       },
-      fillArc: function(x, y, radius, angle1, angle2, ccw, color) {
-        return screen.fillArc(x, y, radius, angle1, angle2, ccw, color);
-      },
-      setCursorVisible: function(visible) {
-        return screen.setCursorVisible(visible);
-      },
-      loadFont: function(font) {
-        return screen.loadFont(font);
-      },
-       isFontReady: function(font) {
-         return screen.isFontReady(font);
+       fillArc: function(x, y, radius, angle1, angle2, ccw, color) {
+         return screen.fillArc(x, y, radius, angle1, angle2, ccw, color);
        },
        setCursorVisible: function(visible) {
          return screen.setCursorVisible(visible);
        },
        loadFont: function(font) {
          return screen.loadFont(font);
+       },
+       isFontReady: function(font) {
+         return screen.isFontReady(font);
        }
      };
    }
@@ -676,15 +670,16 @@ this.Screen = class Screen {
     }
     this.context.globalAlpha = this.alpha;
     this.context.lineWidth = this.line_width;
-    if (args.length < 6) {
+    if (args.length < 4) {
       return;
     }
-    len = Math.floor(args.length / 2);
     transform = this.initDrawOp(0, 0, false);
     this.context.beginPath();
     this.context.moveTo(args[0], -args[1]);
-    for (index = 1; index < len; index++) {
-      this.context.quadraticCurveTo(args[index * 2], -args[index * 2 + 1], args[(index + 1) * 2], -args[(index + 1) * 2 + 1]);
+    index = 2;
+    while (index <= args.length - 4) {
+      this.context.quadraticCurveTo(args[index], -args[index + 1], args[index + 2], -args[index + 3]);
+      index += 4;
     }
     this.context.stroke();
     if (transform) {
@@ -705,15 +700,16 @@ this.Screen = class Screen {
     }
     this.context.globalAlpha = this.alpha;
     this.context.lineWidth = this.line_width;
-    if (args.length < 8) {
+    if (args.length < 4) {
       return;
     }
-    len = Math.floor(args.length / 2);
     transform = this.initDrawOp(0, 0, false);
     this.context.beginPath();
     this.context.moveTo(args[0], -args[1]);
-    for (index = 1; index < len; index++) {
-      this.context.bezierCurveTo(args[index * 2], -args[index * 2 + 1], args[(index + 1) * 2], -args[(index + 1) * 2 + 1], args[(index + 2) * 2], -args[(index + 2) * 2 + 1]);
+    index = 2;
+    while (index <= args.length - 6) {
+      this.context.bezierCurveTo(args[index], -args[index + 1], args[index + 2], -args[index + 3], args[index + 4], -args[index + 5]);
+      index += 6;
     }
     this.context.stroke();
     if (transform) {

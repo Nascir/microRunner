@@ -1173,6 +1173,17 @@ app.get("/api/update/download", async (req, res) => {
                 return;
               }
 
+              const totalBytes = parseInt(response.headers["content-length"]) || 0;
+              let downloadedBytes = 0;
+
+              response.on("data", (chunk) => {
+                downloadedBytes += chunk.length;
+                if (totalBytes > 0) {
+                  const percent = 20 + Math.min(20, (downloadedBytes / totalBytes) * 20);
+                  sendProgress(`Downloading... ${Math.round(percent)}%`, percent);
+                }
+              });
+
               const file = fs.createWriteStream(tempZip);
               response.pipe(file);
               file.on("finish", () => {
@@ -1185,7 +1196,8 @@ app.get("/api/update/download", async (req, res) => {
               });
             },
           )
-          .on("error", reject);
+            .on("error", reject)
+            .setTimeout(60000, () => reject(new Error("Download timeout")));
       }
 
       doRequest(zipUrl);
@@ -1276,6 +1288,8 @@ app.get("/api/update/download", async (req, res) => {
     }, 2000);
   } catch (e) {
     sendProgress("Error: " + e.message, 0);
+    if (fs.existsSync(tempZip)) fs.unlinkSync(tempZip);
+    if (fs.existsSync(tempDir)) fs.rmSync(tempDir, { recursive: true, force: true });
     res.end();
   }
 });
