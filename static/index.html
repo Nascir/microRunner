@@ -971,7 +971,7 @@
                         }
                     }
 
-                    if (data.message && (data.message.includes('complete') || data.message.includes('Updated to'))) {
+                    if (data.progress === 100 || (data.message && (data.message.includes('complete') || data.message.includes('Updated to')))) {
                         setTimeout(() => {
                             eventSource.close();
                             onUpdateComplete();
@@ -981,10 +981,9 @@
 
                 eventSource.onerror = function() {
                     eventSource.close();
-                    // Ignore error if update was successful
                     const msg = progressText.textContent;
-                    if (msg.includes('complete') || msg.includes('Updated to') || msg.includes('v0.')) {
-                        return; // Success - don't show error
+                    if (msg.includes('complete') || msg.includes('Updated to') || msg.includes('v')) {
+                        return;
                     }
                     progressText.textContent = 'Connection lost. Please try again.';
                     progressText.style.color = '#ff6b6b';
@@ -1001,20 +1000,19 @@
                 document.getElementById('update-download-btn').style.display = 'none';
                 document.getElementById('update-close-btn').style.display = 'inline-flex';
 
-                // Show server stopped message
                 const stoppedDiv = document.createElement('div');
                 stoppedDiv.id = 'update-stopped-message';
                 stoppedDiv.style.cssText = 'margin-top: 20px; padding: 16px; background: var(--color-card-bg); border-radius: 8px; border: 1px solid var(--color-accentBorder);';
                 stoppedDiv.innerHTML = `
                     <h4 style="margin: 0 0 12px 0; color: var(--color-accent);">Update Complete</h4>
                     <p style="margin: 0 0 12px 0; line-height: 1.6;">
-                        The update has been installed.
+                        The update has been installed from the main branch.
                     </p>
                     <p style="margin: 0 0 8px 0; line-height: 1.6;">
                         <strong>To continue, run:</strong>
                     </p>
                     <code style="display: block; background: var(--color-darkBg); padding: 12px; border-radius: 4px; margin-bottom: 12px; white-space: pre;">npm install
-npm start</code>
+ npm start</code>
                     <p style="margin: 0; font-size: 12px; color: var(--color-textSecondary);">
                         <i class="fa fa-folder-open"></i> Your projects and backups are preserved.
                     </p>

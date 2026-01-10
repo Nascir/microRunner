@@ -974,38 +974,43 @@ app.get("/api/version", (req, res) => {
   const https = require("https");
   https
     .get(
-      `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`,
+      "https://raw.githubusercontent.com/Nascir/microrunner/main/package.json",
       {
         headers: {
           "User-Agent": "microRunner",
-          Accept: "application/vnd.github.v3+json",
         },
+        timeout: 10000,
       },
       (response) => {
+        if (response.statusCode !== 200) {
+          return res.json({
+            current: currentVersion,
+            latest: currentVersion,
+            hasUpdate: false,
+            downloadUrl: null,
+            error: response.statusCode === 404 ? "Not found" : "Connection failed",
+          });
+        }
+
         let data = "";
         response.on("data", (chunk) => (data += chunk));
         response.on("end", () => {
           try {
-            const release = JSON.parse(data);
-            const latestVersion =
-              release.tag_name?.replace(/^v/, "") || currentVersion;
+            const remotePkg = JSON.parse(data);
+            const latestVersion = remotePkg.version || currentVersion;
             res.json({
               current: currentVersion,
               latest: latestVersion,
               hasUpdate: latestVersion !== currentVersion,
-              releaseUrl: release.html_url || null,
-              downloadUrl: release.zipball_url || null,
-              publishedAt: release.published_at || null,
+              downloadUrl: `https://github.com/Nascir/microrunner/archive/main.zip`,
             });
           } catch (e) {
             res.json({
               current: currentVersion,
               latest: currentVersion,
               hasUpdate: false,
-              releaseUrl: null,
               downloadUrl: null,
-              publishedAt: null,
-              error: "Failed to check updates",
+              error: "Failed to parse remote package.json",
             });
           }
         });
@@ -1016,9 +1021,7 @@ app.get("/api/version", (req, res) => {
         current: currentVersion,
         latest: currentVersion,
         hasUpdate: false,
-        releaseUrl: null,
         downloadUrl: null,
-        publishedAt: null,
         error: "Connection failed",
       });
     });
@@ -1045,44 +1048,81 @@ app.get("/api/update/download", async (req, res) => {
     res.write(`data: ${JSON.stringify(data)}\n\n`);
   }
 
-  try {
-    sendProgress("Checking for latest version...", 5);
+  const excludePatterns = [
+    "projects",
+    "archive",
+    ".gitignore",
+    ".DS_Store",
+    "node_modules",
+    "temp_update_",
+    "temp_extract_",
+    "logs",
+  ];
 
-    const release = await new Promise((resolve, reject) => {
+  function shouldExclude(filePath) {
+    const baseName = path.basename(filePath);
+    return excludePatterns.some((p) => baseName.includes(p));
+  }
+
+  function getAllFiles(dir, baseDir) {
+    const result = [];
+    if (!fs.existsSync(dir)) return result;
+
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry.name);
+      const relativePath = path.relative(baseDir, fullPath);
+      if (shouldExclude(relativePath)) continue;
+
+      if (entry.isDirectory()) {
+        result.push(...getAllFiles(fullPath, baseDir));
+      } else {
+        result.push(relativePath);
+      }
+    }
+    return result;
+  }
+
+  try {
+    sendProgress("Checking for updates...", 5);
+
+    const remotePackageJson = await new Promise((resolve, reject) => {
       https
         .get(
-          `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`,
-          {
-            headers: {
-              "User-Agent": "microRunner",
-              Accept: "application/vnd.github.v3+json",
-            },
-          },
+          "https://raw.githubusercontent.com/Nascir/microrunner/main/package.json",
+          { headers: { "User-Agent": "microRunner" }, timeout: 10000 },
           (response) => {
+            if (response.statusCode !== 200) {
+              reject(new Error(`HTTP ${response.statusCode}`));
+              return;
+            }
             let data = "";
             response.on("data", (chunk) => (data += chunk));
             response.on("end", () => {
               try {
                 resolve(JSON.parse(data));
               } catch (e) {
-                reject(new Error("Failed to parse GitHub response"));
+                reject(new Error("Failed to parse remote package.json"));
               }
             });
           },
         )
-        .on("error", reject);
+        .on("error", reject)
+        .setTimeout(10000, () => {
+          reject(new Error("Request timeout"));
+        });
     });
 
-    const latestVersion = release.tag_name?.replace(/^v/, "");
+    const latestVersion = remotePackageJson.version;
     if (latestVersion === currentVersion) {
       sendProgress("Already up to date", 100);
       res.end();
       return;
     }
 
-    sendProgress(`Downloading v${latestVersion}...`, 20);
+    sendProgress(`Downloading update (${currentVersion} → ${latestVersion})...`, 20);
 
-    const zipUrl = `https://github.com/${GITHUB_REPO}/archive/refs/tags/v${latestVersion}.zip`;
+    const zipUrl = `https://github.com/${GITHUB_REPO}/archive/main.zip`;
     const tempZip = path.join(__dirname, `temp_update_${Date.now()}.zip`);
 
     await new Promise((resolve, reject) => {
@@ -1143,21 +1183,32 @@ app.get("/api/update/download", async (req, res) => {
     const zip = new AdmZip(tempZip);
     zip.extractAllTo(tempDir, true);
 
-    sendProgress("Installing files...", 60);
+    sendProgress("Removing old files...", 50);
 
     const entries = fs.readdirSync(tempDir);
     const sourceDir = path.join(tempDir, entries[0]);
 
-    const excludePatterns = [
-      "projects",
-      "archive",
-      ".gitignore",
-      ".DS_Store",
-      "node_modules",
-      "temp_update_",
-      "temp_extract_",
-      "logs",
-    ];
+    const archiveFiles = getAllFiles(sourceDir, sourceDir);
+    const localFiles = getAllFiles(__dirname, __dirname);
+
+    for (const file of localFiles) {
+      if (!archiveFiles.includes(file)) {
+        const fullPath = path.join(__dirname, file);
+        if (fs.existsSync(fullPath)) {
+          try {
+            if (fs.statSync(fullPath).isDirectory()) {
+              fs.rmSync(fullPath, { recursive: true, force: true });
+            } else {
+              fs.unlinkSync(fullPath);
+            }
+          } catch (e) {
+            console.warn(`Failed to remove ${file}: ${e.message}`);
+          }
+        }
+      }
+    }
+
+    sendProgress("Installing files...", 70);
 
     let filesCopied = 0;
 
@@ -1186,7 +1237,7 @@ app.get("/api/update/download", async (req, res) => {
 
     copyWithExclusions(sourceDir, __dirname);
 
-    sendProgress("Verifying installation...", 80);
+    sendProgress("Verifying installation...", 90);
 
     const newPackagePath = path.join(__dirname, "package.json");
     if (fs.existsSync(newPackagePath)) {
