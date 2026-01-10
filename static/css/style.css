@@ -1099,6 +1099,10 @@ h1 .accent {
     color: var(--color-accent);
 }
 
+#update-modal-title i.fa {
+    margin-right: 8px;
+}
+
 #update-current-version,
 #update-latest-version {
     margin-bottom: 8px;

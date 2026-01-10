@@ -1,8 +1,12 @@
 {
   "name": "microrunner",
-  "version": "26.1.1.b",
+  "version": "26.1.1.c",
   "description": "Local microScript development environment",
   "main": "server.js",
+  "update": {
+    "repository": "Nascir/microrunner",
+    "branch": "main"
+  },
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js"

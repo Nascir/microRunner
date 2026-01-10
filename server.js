@@ -970,11 +970,14 @@ app.get("/api/version", (req, res) => {
     fs.readFileSync(path.join(__dirname, "package.json"), "utf-8"),
   );
   const currentVersion = pkg.version;
+  const updateConfig = pkg.update || { repository: "Nascir/microrunner", branch: "main" };
+  const repo = updateConfig.repository;
+  const branch = updateConfig.branch || "main";
 
   const https = require("https");
   https
     .get(
-      "https://raw.githubusercontent.com/Nascir/microrunner/main/package.json",
+      `https://raw.githubusercontent.com/${repo}/${branch}/package.json`,
       {
         headers: {
           "User-Agent": "microRunner",
@@ -1002,7 +1005,7 @@ app.get("/api/version", (req, res) => {
               current: currentVersion,
               latest: latestVersion,
               hasUpdate: latestVersion !== currentVersion,
-              downloadUrl: `https://github.com/Nascir/microrunner/archive/main.zip`,
+              downloadUrl: `https://github.com/${repo}/archive/${branch}.zip`,
             });
           } catch (e) {
             res.json({
@@ -1030,11 +1033,15 @@ app.get("/api/version", (req, res) => {
 app.get("/api/update/download", async (req, res) => {
   const https = require("https");
   const AdmZip = require("adm-zip");
+  const crypto = require("crypto");
 
   const pkg = JSON.parse(
     fs.readFileSync(path.join(__dirname, "package.json"), "utf-8"),
   );
   const currentVersion = pkg.version;
+  const updateConfig = pkg.update || { repository: "Nascir/microrunner", branch: "main" };
+  const repo = updateConfig.repository;
+  const branch = updateConfig.branch || "main";
 
   res.writeHead(200, {
     "Content-Type": "text/event-stream",
@@ -1061,7 +1068,7 @@ app.get("/api/update/download", async (req, res) => {
 
   function shouldExclude(filePath) {
     const baseName = path.basename(filePath);
-    return excludePatterns.some((p) => baseName.includes(p));
+    return excludePatterns.some((p) => baseName === p);
   }
 
   function getAllFiles(dir, baseDir) {
@@ -1072,7 +1079,7 @@ app.get("/api/update/download", async (req, res) => {
     for (const entry of entries) {
       const fullPath = path.join(dir, entry.name);
       const relativePath = path.relative(baseDir, fullPath);
-      if (shouldExclude(relativePath)) continue;
+      if (shouldExclude(relativePath) || shouldExclude(entry.name)) continue;
 
       if (entry.isDirectory()) {
         result.push(...getAllFiles(fullPath, baseDir));
@@ -1083,13 +1090,20 @@ app.get("/api/update/download", async (req, res) => {
     return result;
   }
 
+  function calculateChecksum(filePath) {
+    const fileBuffer = fs.readFileSync(filePath);
+    const hashSum = crypto.createHash("sha256");
+    hashSum.update(fileBuffer);
+    return hashSum.digest("hex");
+  }
+
   try {
     sendProgress("Checking for updates...", 5);
 
     const remotePackageJson = await new Promise((resolve, reject) => {
       https
         .get(
-          "https://raw.githubusercontent.com/Nascir/microrunner/main/package.json",
+          `https://raw.githubusercontent.com/${repo}/${branch}/package.json`,
           { headers: { "User-Agent": "microRunner" }, timeout: 10000 },
           (response) => {
             if (response.statusCode !== 200) {
@@ -1122,7 +1136,7 @@ app.get("/api/update/download", async (req, res) => {
 
     sendProgress(`Downloading update (${currentVersion} → ${latestVersion})...`, 20);
 
-    const zipUrl = `https://github.com/${GITHUB_REPO}/archive/main.zip`;
+    const zipUrl = `https://github.com/${repo}/archive/${branch}.zip`;
     const tempZip = path.join(__dirname, `temp_update_${Date.now()}.zip`);
 
     await new Promise((resolve, reject) => {
@@ -1177,6 +1191,9 @@ app.get("/api/update/download", async (req, res) => {
       doRequest(zipUrl);
     });
 
+    const checksum = calculateChecksum(tempZip);
+    console.log(`Downloaded archive SHA256: ${checksum}`);
+
     sendProgress("Extracting files...", 40);
 
     const tempDir = path.join(__dirname, `temp_extract_${Date.now()}`);
@@ -1218,7 +1235,7 @@ app.get("/api/update/download", async (req, res) => {
       const stats = fs.statSync(src);
       const baseName = path.basename(src);
 
-      if (excludePatterns.some((p) => baseName.includes(p))) return;
+      if (excludePatterns.some((p) => baseName === p)) return;
 
       if (stats.isDirectory()) {
         if (!fs.existsSync(dest)) fs.mkdirSync(dest, { recursive: true });
