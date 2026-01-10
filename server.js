@@ -1263,7 +1263,7 @@ app.get("/api/update/download", async (req, res) => {
     const newPackagePath = path.join(__dirname, "package.json");
     if (fs.existsSync(newPackagePath)) {
       const newPackage = JSON.parse(fs.readFileSync(newPackagePath, "utf-8"));
-      sendProgress(`Updated to v${newPackage.version}`, 100);
+      sendProgress(`Updated to version ${newPackage.version}`, 100);
     } else {
       sendProgress("Update complete", 100);
     }
