@@ -1200,59 +1200,51 @@ app.get("/api/update/download", async (req, res) => {
     const zip = new AdmZip(tempZip);
     zip.extractAllTo(tempDir, true);
 
-    sendProgress("Removing old files...", 50);
-
     const entries = fs.readdirSync(tempDir);
-    const sourceDir = path.join(tempDir, entries[0]);
+    let sourceDir = null;
 
-    const archiveFiles = getAllFiles(sourceDir, sourceDir);
-    const localFiles = getAllFiles(__dirname, __dirname);
-
-    for (const file of localFiles) {
-      if (!archiveFiles.includes(file)) {
-        const fullPath = path.join(__dirname, file);
-        if (fs.existsSync(fullPath)) {
-          try {
-            if (fs.statSync(fullPath).isDirectory()) {
-              fs.rmSync(fullPath, { recursive: true, force: true });
-            } else {
-              fs.unlinkSync(fullPath);
-            }
-          } catch (e) {
-            console.warn(`Failed to remove ${file}: ${e.message}`);
-          }
+    for (const entry of entries) {
+      const p = path.join(tempDir, entry);
+      if (fs.statSync(p).isDirectory()) {
+        if (fs.existsSync(path.join(p, 'package.json'))) {
+          sourceDir = p;
+          break;
         }
       }
+    }
+
+    if (!sourceDir) {
+      throw new Error("Could not find source directory in update archive");
     }
 
     sendProgress("Installing files...", 70);
 
-    let filesCopied = 0;
+    fs.cpSync(sourceDir, __dirname, {
+      recursive: true,
+      force: true,
+      filter: (src) => {
+        const baseName = path.basename(src);
+        return !excludePatterns.includes(baseName);
+      }
+    });
 
-    function copyWithExclusions(src, dest) {
-      if (!fs.existsSync(src)) return;
+    const archiveFiles = getAllFiles(sourceDir, sourceDir);
+    const localFiles = getAllFiles(__dirname, __dirname);
 
-      const stats = fs.statSync(src);
-      const baseName = path.basename(src);
+    let deletedCount = 0;
+    for (const file of localFiles) {
+      const topLevel = file.split('/')[0];
+      if (excludePatterns.includes(topLevel)) continue;
+      if (archiveFiles.includes(file)) continue;
 
-      if (excludePatterns.some((p) => baseName === p)) return;
-
-      if (stats.isDirectory()) {
-        if (!fs.existsSync(dest)) fs.mkdirSync(dest, { recursive: true });
-        fs.readdirSync(src).forEach((entry) => {
-          copyWithExclusions(path.join(src, entry), path.join(dest, entry));
-        });
-      } else {
-        try {
-          fs.copyFileSync(src, dest);
-          filesCopied++;
-        } catch (e) {
-          console.warn(`Failed to copy ${baseName}: ${e.message}`);
-        }
+      const fullPath = path.join(__dirname, file);
+      if (fs.existsSync(fullPath)) {
+        fs.rmSync(fullPath, { recursive: true, force: true });
+        deletedCount++;
       }
     }
 
-    copyWithExclusions(sourceDir, __dirname);
+    console.log(`[Update] Update complete. ${deletedCount} obsolete files removed.`);
 
     sendProgress("Verifying installation...", 90);
 
@@ -1287,6 +1279,16 @@ createDemoProject();
 migrateAllProjects().then(() => {
   watchAllProjects();
 });
+
+// Sprawdzenie wersji Node.js (wymagana wersja 16+)
+const MIN_NODE_VERSION = 16;
+const currentNodeVersion = parseInt(process.version.slice(1).split('.')[0]);
+if (currentNodeVersion < MIN_NODE_VERSION) {
+  console.error(`Error: Node.js ${MIN_NODE_VERSION}.0.0 or higher is required.`);
+  console.error(`Current version: ${process.version}`);
+  console.error(`Please update Node.js from https://nodejs.org/`);
+  process.exit(1);
+}
 
 server.listen(PORT, () => {
   console.log(`🟢 microRunner running at http://localhost:${PORT}`);

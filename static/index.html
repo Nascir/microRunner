@@ -328,6 +328,7 @@
                         <p id="update-current-version">Current version: <strong>-</strong></p>
                         <p style="margin: 4px 0; color: var(--color-accent); font-size: 20px;">↓</p>
                         <p id="update-latest-version">Latest version: <strong>-</strong></p>
+                        <p id="update-previous-version" style="display: none; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--color-border); color: var(--color-textSecondary); font-size: 14px;">Previous version: <strong>-</strong></p>
                     </div>
                     <div id="update-progress-section" style="display: none; margin-top: 28px;">
                         <div id="update-progress-text" style="margin-bottom: 8px;">Preparing...</div>
@@ -945,6 +946,16 @@
                 const progressFill = document.getElementById('update-progress-fill');
                 const instructionsWaiting = document.getElementById('update-instructions-waiting');
 
+                // Store previous version before update
+                fetch('/api/version')
+                    .then(r => r.json())
+                    .then(data => {
+                        document.getElementById('update-current-version').innerHTML =
+                            'Current version: <strong>version ' + data.current + '</strong>';
+                        document.getElementById('update-previous-version').setAttribute('data-version', data.current || '');
+                    })
+                    .catch(() => {});
+
                 downloadBtn.disabled = true;
                 downloadBtn.innerHTML = '<i class="fa fa-spinner fa-spin"></i>&nbsp; Downloading...';
                 closeBtn.style.display = 'none';
@@ -968,6 +979,20 @@
                             progressText.style.color = '#ff6b6b';
                         } else if (data.message.includes('complete') || data.message.includes('Updated to')) {
                             progressText.style.color = '#9ece6a';
+                            // Update versions display after successful update
+                            fetch('/api/version')
+                                .then(r => r.json())
+                                .then(versionData => {
+                                    document.getElementById('update-current-version').innerHTML =
+                                        'Current version: <strong>version ' + versionData.current + '</strong>';
+                                    const previousVersion = document.getElementById('update-previous-version').getAttribute('data-version');
+                                    if (previousVersion) {
+                                        document.getElementById('update-previous-version').innerHTML =
+                                            'Previous version: <strong>version ' + previousVersion + '</strong>';
+                                        document.getElementById('update-previous-version').style.display = 'block';
+                                    }
+                                })
+                                .catch(() => {});
                         }
                     }
 
