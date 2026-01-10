@@ -1265,7 +1265,14 @@ app.get("/api/update/download", async (req, res) => {
 
     setTimeout(() => {
       res.end();
-      process.exit(0);
+      server.close(() => {
+        console.log('Server closed gracefully');
+        process.exit(0);
+      });
+      setTimeout(() => {
+        console.log('Forcing server shutdown...');
+        process.exit(0);
+      }, 5000);
     }, 2000);
   } catch (e) {
     sendProgress("Error: " + e.message, 0);
@@ -1294,3 +1301,18 @@ server.listen(PORT, () => {
   console.log(`🟢 microRunner running at http://localhost:${PORT}`);
   console.log(`📁 Projects directory: ${PROJECTS_DIR}\n`);
 });
+
+function gracefulShutdown(signal) {
+  console.log(`\n${signal} received. Shutting down gracefully...`);
+  server.close(() => {
+    console.log('Server closed.');
+    process.exit(0);
+  });
+  setTimeout(() => {
+    console.log('Forcing shutdown...');
+    process.exit(1);
+  }, 5000);
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
