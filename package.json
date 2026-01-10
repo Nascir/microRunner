@@ -1,6 +1,6 @@
 {
   "name": "microrunner",
-  "version": "26.1.1.d",
+  "version": "26.1.1.e",
   "description": "Local microScript development environment",
   "main": "server.js",
   "engines": {

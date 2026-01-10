@@ -327,7 +327,7 @@
                     <div id="update-versions">
                         <p id="update-current-version">Current version: <strong>-</strong></p>
                         <p style="margin: 4px 0; color: var(--color-accent); font-size: 20px;">↓</p>
-                        <p id="update-latest-version">Latest version: <strong>-</strong></p>
+                        <p id="update-latest-version">Previous version: <strong>-</strong></p>
                         <p id="update-previous-version" style="display: none; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--color-border); color: var(--color-textSecondary); font-size: 14px;">Previous version: <strong>-</strong></p>
                     </div>
                     <div id="update-progress-section" style="display: none; margin-top: 28px;">
@@ -1024,6 +1024,7 @@
                 document.getElementById('update-instructions-waiting').style.display = 'none';
                 document.getElementById('update-download-btn').style.display = 'none';
                 document.getElementById('update-close-btn').style.display = 'inline-flex';
+                document.getElementById('update-latest-version').style.display = 'none';
 
                 const stoppedDiv = document.createElement('div');
                 stoppedDiv.id = 'update-stopped-message';
