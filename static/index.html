@@ -321,7 +321,7 @@
         <div id="update-modal" class="modal-overlay">
             <div class="modal">
                 <div class="modal-header">
-                    <h2><i class="fa fa-rocket"></i> <span id="update-modal-title">Update Available</span></h2>
+                    <h2><span id="update-modal-title">Update Available</span></h2>
                 </div>
                 <div class="modal-body">
                     <div id="update-versions">
@@ -916,7 +916,7 @@
             }
 
             function showUpdateInfo() {
-                document.getElementById('update-modal-title').innerHTML = '<i class="fa fa-rocket"></i> Update Available';
+                document.getElementById('update-modal-title').innerHTML = '<i class="fa fa-rocket"></i>&nbsp;Update Available';
                 document.getElementById('update-current-version').innerHTML =
                     'Current version: <strong>version ' + updateData.current + '</strong>';
                 document.getElementById('update-latest-version').innerHTML =
@@ -994,7 +994,7 @@
             }
 
             function onUpdateComplete() {
-                document.getElementById('update-modal-title').innerHTML = '<i class="fa fa-check-circle"></i> Update Complete';
+                document.getElementById('update-modal-title').innerHTML = '<i class="fa fa-check-circle"></i>&nbsp;Update Complete';
                 document.getElementById('update-progress-section').style.display = 'none';
                 document.getElementById('update-instructions-waiting').style.display = 'none';
                 document.getElementById('update-download-btn').style.display = 'none';
@@ -1012,7 +1012,7 @@
                         <strong>To continue, run:</strong>
                     </p>
                     <code style="display: block; background: var(--color-darkBg); padding: 12px; border-radius: 4px; margin-bottom: 12px; white-space: pre;">npm install
- npm start</code>
+npm start</code>
                     <p style="margin: 0; font-size: 12px; color: var(--color-textSecondary);">
                         <i class="fa fa-folder-open"></i> Your projects and backups are preserved.
                     </p>
