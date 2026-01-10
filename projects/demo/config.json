@@ -1,8 +1,9 @@
 {
-  "name": "Demo Project",
+  "name": "demo",
   "slug": "demo",
   "graphics": "m1",
   "orientation": "any",
   "aspect": "free",
+  "spriteDirection": "vertical",
   "public": true
 }
