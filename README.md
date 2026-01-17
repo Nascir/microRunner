@@ -7,16 +7,18 @@ Local microScript development environment with hot reload for microStudio games.
 ## Features
 
 - microScript 2.0 compatible - full compiler, runtime, and all APIs
-- Hot reload - changes appear instantly without restarting
-- Integrated terminal - game output and errors below canvas
-- Run, pause, step, and restart controls
+- Hot reload - changes appear instantly via WebSocket (no page refresh)
+- Integrated terminal - print() output and errors
+- Run, pause, step, and restart game
+- Project browser - manage multiple projects
 - Import and export projects in microStudio ZIP format
-- Backup and restore with notes
+- Internal backup and restore with notes
+- Auto check for new microRunner version
 
 ## Install
 
 ```bash
-git clone https://github.com/anomalyco/microrunner.git
+git clone https://github.com/Nascir/microRunner
 cd microrunner
 npm install
 ```
