@@ -1,0 +1,8 @@
+{
+  "ignore": [
+    "projects/**/*.json",
+    "archive/**",
+    "temp_*"
+  ],
+  "delay": 500
+}
