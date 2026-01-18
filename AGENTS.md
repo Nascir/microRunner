@@ -48,9 +48,13 @@ microrunner/
 ├── static/
 │   ├── index.html      # Project browser UI
 │   ├── game.html       # Game runner with terminal
-│   ├── fonts/          # Shared fonts (BitCell, Edunline, Inter, Hack)
+│   ├── fonts/          # GUI fonts only (Inter, Hack)
+│   ├── template/       # Template files for new projects
+│   │   ├── BitCell.ttf # Default game font
+│   │   ├── icon.png    # Default project icon
+│   │   └── main.ms     # Default main.ms
 │   ├── css/
-│   │   ├── fonts.css         # Shared @font-face definitions (Inter, Hack, BitCell, Edunline)
+│   │   ├── fonts.css         # @font-face (Inter, Hack only)
 │   │   ├── style.css
 │   │   └── terminal.css
 │   └── js/
@@ -92,6 +96,16 @@ When syncing from upstream microStudio, preserve these modifications:
 
 ### Config (`src/config.js`)
 - `getSpriteProperties()` normalizes sprite names (removes .png extension for key lookup)
+
+### Font Loading (`static/js/runtime/assetmanager.js` and `screen.js`)
+- Font names are case-sensitive - use exact name matching the font file
+- `asset_manager.loadFont()` preserves original case from font file name
+- `screen.loadFont()` and `screen.isFontReady()` use the same case as passed
+- All asset references (fonts, sprites, maps, sounds, music) preserve case when:
+  - Exporting to microStudio ZIP format
+  - Creating backups
+  - Importing projects from ZIP archives
+  - Restoring projects from backups
 
 ## Utility Modules
 
@@ -150,7 +164,35 @@ backup.getProjectPath(project)
 3. **New screen API**: Add method to Screen class in `screen.js`
 4. **Project configuration**: Update `getProjectConfig()` and `project.toml` schema
 
-## Reference
+## Font Loading
+
+microRunner uses a unified approach for loading fonts in projects. See [docs/fonts.md](docs/fonts.md) for detailed documentation.
+
+### Built-in Fonts
+
+| Font | Location | Setup Required |
+|------|----------|----------------|
+| **BitCell** | `static/fonts/BitCell.ttf` | No - loaded automatically |
+| **Inter, Hack** | `static/fonts/` | No - UI fonts only |
+| **Other fonts** | `assets/` | Yes - requires `asset_manager.loadFont()` |
+
+### microStudio Built-in Fonts
+
+microStudio includes 47 built-in fonts that are NOT available in microRunner. When a project uses one of these fonts, a warning is displayed in the terminal:
+
+```
+⚠️ Font "ModernDos" is a built-in microStudio font. microRunner doesn't include built-in fonts (except BitCell).
+Download "ModernDos.ttf" from microStudio and add it to your assets/ folder.
+```
+
+**List of unsupported microStudio fonts:**
+AESystematic, Alkhemikal, AlphaBeta, Arpegius, Awesome, block_cell, Blocktopia, Comicoro, Commodore64, DigitalDisco, Edunline, EnchantedSword, EnterCommand, Euxoi, FixedBold, GenericMobileSystem, GrapeSoda, JupiterCrash, Kapel, KiwiSoda, Litebulb8bit, LycheeSoda, MisterPixel, ModernDos, NokiaCellPhone, PearSoda, PixAntiqua, PixChicago, PixelArial, PixelOperator, Pixellari, Pixolde, PlanetaryContact, PressStart2P, RainyHearts, RetroGaming, Revolute, Romulus, Scriptorium, Squarewave, Thixel, Unbalanced, UpheavalPro, VeniceClassic, ZXSpectrum, Zepto
+
+### Implementation
+
+- `BUILTIN_FONTS` array in `screen.js` contains the list of unsupported microStudio fonts
+- `loadFont()` triggers a warning for built-in microStudio fonts (shown once per font)
+- `loadBuiltinFont()` automatically loads BitCell from `static/fonts/`
 
 - **microStudio Repository**: https://github.com/pmgl/microstudio
 - Use for compatibility checks when implementing features

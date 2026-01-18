@@ -37,13 +37,3 @@
     font-style: normal;
     font-display: swap;
 }
-
-@font-face {
-    font-family: "BitCell";
-    src: url("/fonts/BitCell.ttf") format("truetype");
-}
-
-@font-face {
-    font-family: "Edunline";
-    src: url("/fonts/Edunline.ttf") format("truetype");
-}

@@ -1,4 +1,16 @@
 this.Screen = class Screen {
+  BUILTIN_FONTS = [
+    'AESystematic', 'Alkhemikal', 'AlphaBeta', 'Arpegius', 'Awesome',
+    'block_cell', 'Blocktopia', 'Comicoro', 'Commodore64', 'DigitalDisco', 'Edunline',
+    'EnchantedSword', 'EnterCommand', 'Euxoi', 'FixedBold', 'GenericMobileSystem',
+    'GrapeSoda', 'JupiterCrash', 'Kapel', 'KiwiSoda', 'Litebulb8bit', 'LycheeSoda',
+    'MisterPixel', 'ModernDos', 'NokiaCellPhone', 'PearSoda', 'PixAntiqua', 'PixChicago',
+    'PixelArial', 'PixelOperator', 'Pixellari', 'Pixolde', 'PlanetaryContact',
+    'PressStart2P', 'RainyHearts', 'RetroGaming', 'Revolute', 'Romulus', 'Scriptorium',
+    'Squarewave', 'Thixel', 'Unbalanced', 'UpheavalPro', 'VeniceClassic',
+    'ZXSpectrum', 'Zepto'
+  ];
+
   constructor(runtime, canvas) {
     this.runtime = runtime;
     this.canvas = canvas || document.createElement("canvas");
@@ -32,7 +44,7 @@ this.Screen = class Screen {
     this.font = "BitCell";
     this.font_load_requested = {};
     this.font_loaded = {};
-    this.loadFont(this.font);
+    this.loadBuiltinFont("BitCell");
     this.initContext();
     this.cursor = "default";
     this.canvas.addEventListener("mousemove", () => {
@@ -384,26 +396,94 @@ this.Screen = class Screen {
     return this.loadFont(this.font);
   }
 
-  loadFont(font = "BitCell") {
-    var err;
-    if (!this.font_load_requested[font]) {
-      this.font_load_requested[font] = true;
-      try {
-        if ((document.fonts != null) && (document.fonts.load != null)) {
-          document.fonts.load(`16pt ${font}`);
+  loadBuiltinFont(font) {
+    if (this.font_loaded[font]) {
+      return;
+    }
+    try {
+      const fontFace = new FontFace(font, `url(/fonts/${font}.ttf)`);
+      fontFace.load().then((loaded) => {
+        document.fonts.add(loaded);
+        this.font_loaded[font] = true;
+      }).catch((err) => {
+        if (this.runtime?.listener?.reportWarning) {
+          this.runtime.listener.reportWarning({
+            message: `Failed to load built-in font "${font}": ${err.message}`,
+            type: 'font_load_error'
+          });
         }
-      } catch (error) {
-        err = error;
+      });
+    } catch (e) {
+      if (this.runtime?.listener?.reportWarning) {
+        this.runtime.listener.reportWarning({
+          message: `Failed to create FontFace for "${font}": ${e.message}`,
+          type: 'font_load_error'
+        });
       }
     }
-    return 1;
+  }
+
+  loadFont(font) {
+    if (!font) return 1;
+
+    const guiFonts = ['inter', 'hack'];
+    const assetFonts = this.runtime?.asset_manager?.loadedFonts;
+
+    const isGuiFont = guiFonts.includes(font);
+    const isAssetFont = assetFonts?.has(font);
+    const isBuiltinFont = this.BUILTIN_FONTS.includes(font);
+
+    if (this.font_loaded[font]) {
+      return 1;
+    }
+
+    if (isGuiFont || isAssetFont) {
+      this.font_loaded[font] = true;
+      return 1;
+    }
+
+    if (isBuiltinFont) {
+      if (this.warnedFonts == null) {
+        this.warnedFonts = new Set();
+      }
+      if (this.warnedFonts.has(font)) {
+        this.font_loaded[font] = true;
+        return 1;
+      }
+      this.warnedFonts.add(font);
+
+      if (this.runtime?.listener?.reportWarning) {
+        this.runtime.listener.reportWarning({
+          message: `Font "${font}" is a built-in microStudio font. ` +
+                   `microRunner doesn't include built-in fonts (except BitCell). ` +
+                   `Download "${font}.ttf" from microStudio and add it to your assets/ folder.`,
+          type: 'builtin_font_used',
+          font: font
+        });
+      }
+      this.font_loaded[font] = true;
+      return 1;
+    }
+
+    const msg = `Font "${font}" is not loaded - call asset_manager.loadFont("${font}") first`;
+    if (this.runtime?.listener?.reportWarning) {
+      this.runtime.listener.reportWarning({
+        message: msg,
+        type: 'font_not_found'
+      });
+    } else {
+      console.error(msg);
+    }
+    return 0;
   }
 
   isFontReady(font = this.font) {
     var err, res;
+
     if (this.font_loaded[font]) {
       return 1;
     }
+
     try {
       if ((document.fonts != null) && (document.fonts.check != null)) {
         res = document.fonts.check(`16pt ${font}`);

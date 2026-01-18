@@ -1,6 +1,7 @@
 this.AssetManager = class AssetManager {
   constructor(runtime) {
     this.runtime = runtime;
+    this.loadedFonts = new Set();
     this.interface = {
       loadFont: (font) => {
         return this.loadFont(font);
@@ -44,11 +45,29 @@ this.AssetManager = class AssetManager {
     try {
       font = new FontFace(name, `url(/api/assets/${this.runtime.projectName}/${file}.ttf)`);
       return font.load().then(() => {
-        return document.fonts.add(font);
+        document.fonts.add(font);
+        this.loadedFonts.add(name);
+        this.runtime?.listener?.log(`Font loaded: ${name}`);
+      }).catch((err) => {
+        if (this.runtime?.listener?.reportWarning) {
+          let msg = `Failed to load font "${name}": ${err.message}`;
+          if (err.message.includes("network") || err.message.includes("Failed to load resource")) {
+            msg = `Font file not found: assets/${name}.ttf. Check that the file exists and the name is correct (case-sensitive).`;
+          }
+          this.runtime.listener.reportWarning({
+            message: msg,
+            type: 'font_load_error'
+          });
+        }
       });
     } catch (error) {
       err = error;
-      return console.error(err);
+      if (this.runtime?.listener?.reportWarning) {
+        this.runtime.listener.reportWarning({
+          message: `Failed to load font "${name}": ${err.message}`,
+          type: 'font_load_error'
+        });
+      }
     }
   }
 

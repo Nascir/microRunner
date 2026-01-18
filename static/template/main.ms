@@ -1,0 +1,10 @@
+init = function()
+end
+
+update = function()
+end
+
+draw = function()
+  screen.clear()
+  screen.drawText("Hello, World!", 0, 0, 12, "white")
+end

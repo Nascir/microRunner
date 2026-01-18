@@ -29,20 +29,29 @@ const projectSpriteWatchers = new Map();
 const projectWsClients = new Map();
 
 function ensureProjectStructure(projectPath, projectName, options = {}) {
+  const templatePath = path.join(__dirname, 'static', 'template');
+
   fs.mkdirSync(path.join(projectPath, 'ms'), { recursive: true });
   fs.mkdirSync(path.join(projectPath, 'sprites'), { recursive: true });
+  fs.mkdirSync(path.join(projectPath, 'assets'), { recursive: true });
 
-  const defaultIconPath = path.join(__dirname, 'static', 'icon.png');
-  if (fs.existsSync(defaultIconPath)) {
-    fs.copyFileSync(
-      defaultIconPath,
-      path.join(projectPath, 'sprites', 'icon.png'),
-    );
+  const templateIconPath = path.join(templatePath, 'icon.png');
+  if (fs.existsSync(templateIconPath)) {
+    fs.copyFileSync(templateIconPath, path.join(projectPath, 'sprites', 'icon.png'));
+  }
+
+  const templateFontPath = path.join(templatePath, 'BitCell.ttf');
+  if (fs.existsSync(templateFontPath)) {
+    fs.copyFileSync(templateFontPath, path.join(projectPath, 'assets', 'BitCell.ttf'));
   }
 
   const mainMsPath = path.join(projectPath, 'ms', 'main.ms');
   if (!fs.existsSync(mainMsPath)) {
-    const mainMs = `init = function()
+    const templateMainMsPath = path.join(templatePath, 'main.ms');
+    if (fs.existsSync(templateMainMsPath)) {
+      fs.copyFileSync(templateMainMsPath, mainMsPath);
+    } else {
+      const mainMs = `init = function()
 end
 
 update = function()
@@ -53,7 +62,8 @@ draw = function()
   screen.drawText("Hello, World!", 0, 0, 12, "white")
 end
 `;
-    fs.writeFileSync(mainMsPath, mainMs);
+      fs.writeFileSync(mainMsPath, mainMs);
+    }
   }
 
   if (options.createConfig !== false) {

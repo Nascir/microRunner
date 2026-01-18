@@ -1,6 +1,6 @@
 # microRunner
 
-> **Warning: This is an experimental version.** The software may contain bugs, breaking changes, or unexpected behavior. Use with caution and expect potential issues. Back up your projects regularly.
+> **Warning: This is a beta version.** The software may contain bugs, breaking changes, or unexpected behavior. Use with caution and expect potential issues. Back up your projects regularly.
 
 Local microScript development environment with hot reload for microStudio games.
 
@@ -8,7 +8,7 @@ Local microScript development environment with hot reload for microStudio games.
 
 - microScript 2.0 compatible - full compiler, runtime, and all APIs
 - Hot reload - changes appear instantly via WebSocket (no page refresh)
-- Integrated terminal - print() output and errors
+- Integrated terminal - print() output, warnings, errors and enhanced debugging information
 - Run, pause, step, and restart game
 - Project browser - manage multiple projects
 - Import and export projects in microStudio ZIP format
@@ -31,40 +31,33 @@ npm start
 
 Open http://localhost:3000
 
+## Get started
+
+1. **Create or import a project**
+   - Click "New Project" in the project browser to create a new project
+   - Or "Import" to import a project from a microStudio ZIP archive
+
+2. **Open the project in the IDE**
+   - Open the project folder in your favorite IDE
+   - Write your microScript code in the `ms/` folder (e.g., `ms/main.ms`)
+   - Add assets to their respective folders:
+     - `sprites/` - sprite images
+     - `maps/` - map files
+     - `sounds/` - sound effects
+     - `music/` - music tracks
+     - `assets/` - fonts and other resources
+
+## Guides
+
+Additional guides are available in the `docs/` folder:
+
+- [Setting Up Fonts](docs/fonts.md) - How to use custom fonts in your projects
+- [Sprites](docs/sprites.md) - How to configure sprite animations
+
 ## System Requirements
 
 - Node.js 16.0 or higher
 - Modern browser (Chrome, Firefox, Safari)
-
-## Sprites
-
-Configure sprite animations in your project's `project.toml` file.
-
-**Sprite sheet layout:**
-```toml
-[sprites]
-direction = "vertical"   # default - frames stacked top to bottom
-# direction = "horizontal"  # frames stacked left to right
-```
-
-**Animation frames:**
-```toml
-[sprites."player.png"]
-frames = 4  # number of animation frames in the sprite sheet
-```
-
-Frames are detected automatically from image dimensions:
-- Vertical: `frames = height / width` (e.g., 64×128 = 2 frames)
-- Horizontal: `frames = width / height` (e.g., 128×64 = 2 frames)
-
-**Animation speed:**
-Default FPS is 5. Change at runtime in your microScript code:
-```
-mySprite = sprites.player
-mySprite.setFPS(20)  # Change animation speed
-```
-
-**Import:** When importing from microStudio ZIP, sprite properties are preserved.
 
 ## Licenses
 
