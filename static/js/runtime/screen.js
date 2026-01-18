@@ -672,7 +672,7 @@ this.Screen = class Screen {
     } else {
       this.context.beginPath();
       this.context.ellipse(x - this.anchor_x * w / 2, -y + this.anchor_y * h / 2, w / 2, h / 2, 0, 0, Math.PI * 2, false);
-      return this.context.fill();
+      return this.context.stroke();
     }
   }
 
