@@ -1370,6 +1370,9 @@ app.get('/api/update/download', async (req, res) => {
     return hashSum.digest('hex');
   }
 
+  let tempZip = null;
+  let tempDir = null;
+
   try {
     sendProgress('Checking for updates...', 5);
 
@@ -1410,7 +1413,7 @@ app.get('/api/update/download', async (req, res) => {
     sendProgress(`Downloading update (${currentVersion} → ${latestVersion})...`, 20);
 
     const zipUrl = `https://github.com/${repo}/archive/${branch}.zip`;
-    const tempZip = path.join(__dirname, `temp_update_${Date.now()}.zip`);
+    tempZip = path.join(__dirname, `temp_update_${Date.now()}.zip`);
 
     await new Promise((resolve, reject) => {
       let redirects = 0;
@@ -1481,7 +1484,7 @@ app.get('/api/update/download', async (req, res) => {
 
     sendProgress('Extracting files...', 40);
 
-    const tempDir = path.join(__dirname, `temp_extract_${Date.now()}`);
+    tempDir = path.join(__dirname, `temp_extract_${Date.now()}`);
     const zip = new AdmZip(tempZip);
     zip.extractAllTo(tempDir, true);
 
