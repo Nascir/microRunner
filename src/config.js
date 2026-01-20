@@ -37,20 +37,37 @@ function getDocumentsPath() {
 
 function generateDefaultProjectPath(baseName) {
   const documentsPath = getDocumentsPath();
-  const baseFolder = path.join(documentsPath, 'Project-1');
+  const baseFolder = path.join(documentsPath, baseName);
+  if (!fs.existsSync(baseFolder)) {
+    return baseFolder;
+  }
   let counter = 1;
   let projectPath;
 
   do {
-    if (counter === 1) {
-      projectPath = baseFolder;
-    } else {
-      projectPath = path.join(documentsPath, `Project-${counter}`);
-    }
+    projectPath = path.join(documentsPath, `${baseName}-${counter}`);
     counter++;
   } while (fs.existsSync(projectPath));
 
   return projectPath;
+}
+
+function generateUniqueFolderName(baseName) {
+  const documentsPath = getDocumentsPath();
+  const baseFolder = path.join(documentsPath, baseName);
+  if (!fs.existsSync(baseFolder)) {
+    return baseName;
+  }
+  let counter = 1;
+
+  do {
+    const candidate = `${baseName}-${counter}`;
+    const candidatePath = path.join(documentsPath, candidate);
+    if (!fs.existsSync(candidatePath)) {
+      return candidate;
+    }
+    counter++;
+  } while (true);
 }
 
 function isPathExists(absolutePath) {
@@ -368,6 +385,8 @@ module.exports = {
   detectSpriteFrames,
   touch,
   generateDefaultProjectPath,
+  generateUniqueFolderName,
+  getDocumentsPath,
   isPathExists,
   readProjectsToml,
   writeProjectsToml,

@@ -11,10 +11,6 @@ function closeBackupModal() {
   currentBackupProject = null;
 }
 
-document.getElementById('backup-modal').addEventListener('click', function(e) {
-  if (e.target === this) closeBackupModal();
-});
-
 async function loadBackupList() {
   if (!currentBackupProject) return;
 

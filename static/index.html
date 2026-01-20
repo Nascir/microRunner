@@ -44,9 +44,16 @@
             <div class="section-header">
                 <div class="section-title">Your Projects</div>
                 <div class="header-actions">
+                    <button
+                        class="btn btn-icon"
+                        onclick="openProjectFolder()"
+                        title="Open existing project"
+                    >
+                        <i class="fa fa-folder-open"></i>
+                    </button>
                     <label
-                        class="btn btn-icon btn-import"
-                        title="Import from microStudio"
+                        class="btn btn-icon"
+                        title="Import ZIP from microStudio"
                     >
                         <i class="fa fa-download"></i>
                         <input
@@ -73,7 +80,10 @@
                         Create a new project or click on one above to run it in
                         the browser
                     </li>
-                    <li>Open your IDE: <code>{project-path}/ms/</code></li>
+                    <li>
+                        Open the project in your IDE:
+                        <code>{project-path}/ms/</code>
+                    </li>
                     <li>Edit <code>*.ms</code> files and see changes live!</li>
                 </ol>
             </div>
@@ -108,18 +118,30 @@
                         />
                     </div>
                     <div class="form-group">
-                        <label for="config-slug">Folder name</label>
+                        <label for="config-slug"
+                            >Slug
+                            <small
+                                >(URL:
+                                <span id="config-slug-preview"
+                                    >http://localhost:3000/my-project</span
+                                >)</small
+                            ></label
+                        >
                         <input
                             type="text"
                             id="config-slug"
                             placeholder="project-folder"
                         />
-                        <div id="slug-warning" class="warning-text">
-                            <i class="fa fa-exclamation-triangle"></i>
-                            Changing the folder name will rename the project
-                            folder and break active sessions. Server restart
-                            required for changes to take effect.
-                        </div>
+                        <div id="config-slug-status" class="form-hint"></div>
+                    </div>
+                    <div class="form-group">
+                        <label for="config-path">Path</label>
+                        <input
+                            type="text"
+                            id="config-path"
+                            readonly
+                            class="form-input-readonly"
+                        />
                     </div>
                     <div class="form-group">
                         <label for="config-orientation">Orientation</label>
@@ -279,6 +301,23 @@
                         />
                     </div>
                     <div class="form-group">
+                        <label for="create-slug"
+                            >Slug
+                            <small
+                                >(URL:
+                                <span id="create-slug-preview"
+                                    >http://localhost:3000/my-awesome-game</span
+                                >)</small
+                            ></label
+                        >
+                        <input
+                            type="text"
+                            id="create-slug"
+                            placeholder="my-awesome-game"
+                        />
+                        <div id="create-slug-status" class="form-hint"></div>
+                    </div>
+                    <div class="form-group">
                         <label for="create-path">Path</label>
                         <div class="path-input-wrapper">
                             <input
@@ -377,6 +416,23 @@
                         />
                     </div>
                     <div class="form-group">
+                        <label for="import-slug"
+                            >Slug
+                            <small
+                                >(URL:
+                                <span id="import-slug-preview"
+                                    >http://localhost:3000/my-project</span
+                                >)</small
+                            ></label
+                        >
+                        <input
+                            type="text"
+                            id="import-slug"
+                            placeholder="my-project"
+                        />
+                        <div id="import-slug-status" class="form-hint"></div>
+                    </div>
+                    <div class="form-group">
                         <label for="import-path">Path</label>
                         <div class="path-input-wrapper">
                             <input
@@ -387,7 +443,7 @@
                             <button
                                 type="button"
                                 class="btn btn-secondary"
-                                onclick="pickFolder()"
+                                onclick="pickFolder('import-path')"
                                 title="Choose folder"
                             >
                                 <i class="fa fa-folder-open"></i>
@@ -480,6 +536,23 @@
                         />
                     </div>
                     <div class="form-group">
+                        <label for="duplicate-slug"
+                            >Slug
+                            <small
+                                >(URL:
+                                <span id="duplicate-slug-preview"
+                                    >http://localhost:3000/my-project-1</span
+                                >)</small
+                            ></label
+                        >
+                        <input
+                            type="text"
+                            id="duplicate-slug"
+                            placeholder="my-project-1"
+                        />
+                        <div id="duplicate-slug-status" class="form-hint"></div>
+                    </div>
+                    <div class="form-group">
                         <label for="duplicate-path">Path</label>
                         <div class="path-input-wrapper">
                             <input
@@ -490,7 +563,7 @@
                             <button
                                 type="button"
                                 class="btn btn-secondary"
-                                onclick="pickFolder()"
+                                onclick="pickFolder('duplicate-path')"
                                 title="Choose folder"
                             >
                                 <i class="fa fa-folder-open"></i>
@@ -644,26 +717,7 @@
                                 <li>Click "Download Update" below</li>
                                 <li>Wait for download and installation</li>
                                 <li>
-                                    Run:
-                                    <code
-                                        style="
-                                            background: var(--color-darkBg);
-                                            padding: 2px 6px;
-                                            border-radius: 4px;
-                                        "
-                                        >npm install</code
-                                    >
-                                </li>
-                                <li>
-                                    Run:
-                                    <code
-                                        style="
-                                            background: var(--color-darkBg);
-                                            padding: 2px 6px;
-                                            border-radius: 4px;
-                                        "
-                                        >npm start</code
-                                    >
+                                    The server will restart automatically
                                 </li>
                             </ol>
                             <p
@@ -701,6 +755,67 @@
         <script src="/js/backup.js"></script>
         <script>
             let currentImportFile = null;
+
+            document.addEventListener("keydown", (e) => {
+                if (e.key === "Escape" || e.key === "Esc") {
+                    const noteOverlay = document.querySelector(
+                        ".note-expand-overlay",
+                    );
+                    if (noteOverlay) {
+                        closeNoteExpand();
+                        return;
+                    }
+                    const activeNoteCard = document.querySelector(
+                        ".project-card.note-mode",
+                    );
+                    if (activeNoteCard) {
+                        const slug = activeNoteCard.dataset.slug;
+                        if (slug) {
+                            handleNoteCancel(slug);
+                            return;
+                        }
+                    }
+                    closeTopmostModal();
+                }
+            });
+
+            document.querySelectorAll(".modal-overlay").forEach((overlay) => {
+                overlay.addEventListener("click", (e) => {
+                    if (e.target === overlay) closeTopmostModal();
+                });
+            });
+
+            function closeTopmostModal() {
+                const openModals = document.querySelectorAll(
+                    '.modal-overlay[style*="flex"]',
+                );
+                if (openModals.length > 0) {
+                    const modalId = openModals[0].id;
+                    switch (modalId) {
+                        case "config-modal":
+                            closeConfigModal();
+                            break;
+                        case "create-modal":
+                            closeCreateModal();
+                            break;
+                        case "duplicate-modal":
+                            closeDuplicateModal();
+                            break;
+                        case "import-modal":
+                            closeImportModal();
+                            break;
+                        case "delete-modal":
+                            closeDeleteModal();
+                            break;
+                        case "backup-modal":
+                            closeBackupModal();
+                            break;
+                        case "update-modal":
+                            closeUpdateModal();
+                            break;
+                    }
+                }
+            }
 
             async function importProject(input) {
                 const file = input.files[0];
@@ -749,8 +864,103 @@
                 }
             }
 
+            async function openProjectFolder() {
+                try {
+                    const response = await fetch("/api/system/pick-folder");
+                    const data = await response.json();
+
+                    if (data.cancelled || !data.path) {
+                        return;
+                    }
+
+                    const res = await fetch("/api/project/open", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ path: data.path }),
+                    });
+
+                    const result = await res.json();
+
+                    if (result.success) {
+                        if (result.alreadyExists) {
+                            window.location.href = "/" + result.slug;
+                            return;
+                        }
+
+                        loadProjects();
+
+                        if (result.slugChanged) {
+                            showModal(
+                                "Project Opened",
+                                `Project opened successfully.\n\nSlug was changed from "${result.oldSlug}" to "${result.newSlug}" to avoid conflict.`,
+                                "info",
+                                null,
+                                {
+                                    text: "Otwórz projekt",
+                                    action: () =>
+                                        (window.location.href =
+                                            "/" + result.newSlug),
+                                },
+                            );
+                        } else {
+                            window.location.href = "/" + result.slug;
+                        }
+                    } else {
+                        showModal(
+                            "Invalid Project",
+                            result.error || "Unknown error",
+                            "error",
+                        );
+                    }
+                } catch (e) {
+                    showModal(
+                        "Error",
+                        "Failed to open project: " + e.message,
+                        "error",
+                    );
+                }
+            }
+
+            async function checkImportSlugExists(slug) {
+                try {
+                    const res = await fetch(
+                        "/api/slug-exists?slug=" + encodeURIComponent(slug),
+                    );
+                    const data = await res.json();
+
+                    const statusEl =
+                        document.getElementById("import-slug-status");
+                    const slugInput = document.getElementById("import-slug");
+                    const importBtn = document.getElementById("import-btn");
+
+                    if (data.exists) {
+                        statusEl.textContent =
+                            "A project with this slug already exists";
+                        statusEl.className = "form-hint slug-exists";
+                        slugInput.classList.add("error");
+                        importBtn.disabled = true;
+                    } else {
+                        statusEl.textContent = "";
+                        statusEl.className = "form-hint";
+                        slugInput.classList.remove("error");
+                        importBtn.disabled = false;
+                    }
+                } catch (err) {
+                    // Silently fail - slug check is non-critical
+                }
+            }
+
             function openImportModal(data, input) {
                 document.getElementById("import-name").value = data.name || "";
+                document.getElementById("import-slug").value = data.slug || "";
+                document.getElementById("import-slug-preview").textContent =
+                    window.location.origin + "/" + (data.slug || "");
+                document.getElementById("import-slug-status").textContent = "";
+                document.getElementById("import-slug-status").className =
+                    "form-hint";
+                document
+                    .getElementById("import-slug")
+                    .classList.remove("error");
                 document.getElementById("import-path").value =
                     data.suggestedPath || "";
                 document.getElementById("import-orientation").value =
@@ -769,6 +979,33 @@
                 }
 
                 document.getElementById("import-modal").style.display = "flex";
+
+                const pathInput = document.getElementById("import-path");
+                delete pathInput.dataset.manual;
+                document.getElementById("import-path").oninput = function (e) {
+                    e.target.dataset.manual = "true";
+                };
+
+                const debouncedCheckSlug = debounce((slug) => {
+                    checkImportSlugExists(slug);
+                }, 100);
+
+                document.getElementById("import-name").oninput = function (e) {
+                    const slugField = document.getElementById("import-slug");
+                    if (!slugField.dataset.manual) {
+                        slugField.value =
+                            generateSlug(e.target.value) || data.slug;
+                    }
+                    document.getElementById("import-slug-preview").textContent =
+                        window.location.origin + "/" + slugField.value;
+                };
+
+                document.getElementById("import-slug").oninput = function (e) {
+                    e.target.dataset.manual = "true";
+                    document.getElementById("import-slug-preview").textContent =
+                        window.location.origin + "/" + e.target.value;
+                    debouncedCheckSlug(e.target.value.trim());
+                };
             }
 
             function closeImportModal() {
@@ -822,6 +1059,10 @@
                     const formData = new FormData();
                     formData.append("file", currentImportFile);
                     formData.append("name", name);
+                    formData.append(
+                        "slug",
+                        document.getElementById("import-slug").value.trim(),
+                    );
                     formData.append("customPath", path);
                     formData.append("orientation", orientation);
                     formData.append("aspect", aspect);
@@ -872,9 +1113,52 @@
                 }
             }
 
+            async function checkDuplicateSlugExists(slug) {
+                try {
+                    const res = await fetch(
+                        "/api/slug-exists?slug=" + encodeURIComponent(slug),
+                    );
+                    const data = await res.json();
+
+                    const statusEl = document.getElementById(
+                        "duplicate-slug-status",
+                    );
+                    const slugInput = document.getElementById("duplicate-slug");
+                    const duplicateBtn =
+                        document.getElementById("duplicate-btn");
+
+                    if (data.exists) {
+                        statusEl.textContent =
+                            "A project with this slug already exists";
+                        statusEl.className = "form-hint slug-exists";
+                        slugInput.classList.add("error");
+                        duplicateBtn.disabled = true;
+                    } else {
+                        statusEl.textContent = "";
+                        statusEl.className = "form-hint";
+                        slugInput.classList.remove("error");
+                        duplicateBtn.disabled = false;
+                    }
+                } catch (err) {
+                    // Silently fail - slug check is non-critical
+                }
+            }
+
             function openDuplicateModal(data) {
+                currentDuplicateSource = data.slug;
                 document.getElementById("duplicate-name").value =
                     data.suggestedName || "";
+                document.getElementById("duplicate-slug").value =
+                    data.slug || "";
+                document.getElementById("duplicate-slug-preview").textContent =
+                    window.location.origin + "/" + (data.slug || "");
+                document.getElementById("duplicate-slug-status").textContent =
+                    "";
+                document.getElementById("duplicate-slug-status").className =
+                    "form-hint";
+                document
+                    .getElementById("duplicate-slug")
+                    .classList.remove("error");
                 document.getElementById("duplicate-path").value =
                     data.suggestedPath || "";
                 document.getElementById("duplicate-orientation").value =
@@ -886,6 +1170,43 @@
 
                 document.getElementById("duplicate-modal").style.display =
                     "flex";
+
+                const pathInput = document.getElementById("duplicate-path");
+                delete pathInput.dataset.manual;
+                document.getElementById("duplicate-path").oninput = function (
+                    e,
+                ) {
+                    e.target.dataset.manual = "true";
+                };
+
+                const debouncedCheckSlug = debounce((slug) => {
+                    checkDuplicateSlugExists(slug);
+                }, 100);
+
+                document.getElementById("duplicate-name").oninput = function (
+                    e,
+                ) {
+                    const slugField = document.getElementById("duplicate-slug");
+                    if (!slugField.dataset.manual) {
+                        slugField.value =
+                            generateSlug(e.target.value) || data.slug;
+                    }
+                    document.getElementById(
+                        "duplicate-slug-preview",
+                    ).textContent =
+                        window.location.origin + "/" + slugField.value;
+                };
+
+                document.getElementById("duplicate-slug").oninput = function (
+                    e,
+                ) {
+                    e.target.dataset.manual = "true";
+                    document.getElementById(
+                        "duplicate-slug-preview",
+                    ).textContent =
+                        window.location.origin + "/" + e.target.value;
+                    debouncedCheckSlug(e.target.value.trim());
+                };
             }
 
             function closeDuplicateModal() {
@@ -942,6 +1263,9 @@
                             headers: { "Content-Type": "application/json" },
                             body: JSON.stringify({
                                 name,
+                                slug: document
+                                    .getElementById("duplicate-slug")
+                                    .value.trim(),
                                 path,
                                 orientation,
                                 aspect,
@@ -981,6 +1305,7 @@
                 type,
                 warningHtml = null,
                 button = null,
+                allowHtml = false,
             ) {
                 const overlay = document.createElement("div");
                 overlay.className = "dialog-overlay";
@@ -993,13 +1318,16 @@
                 const buttonHtml = button
                     ? `<button class="btn btn-primary" id="dialog-action">${escapeHtml(button.text)}</button>`
                     : "";
+                const messageContent = allowHtml
+                    ? message.replace(/\n/g, "<br>")
+                    : escapeHtml(message).replace(/\n/g, "<br>");
                 overlay.innerHTML = `
                     <div class="dialog">
                         <div class="dialog-header">
                             <h3><i class="fa ${iconClass}"></i> ${escapeHtml(title)}</h3>
                         </div>
                         <div class="dialog-body">
-                            <p>${escapeHtml(message).replace(/\n/g, "<br>")}</p>
+                            <p>${messageContent}</p>
                             ${warningHtml ? `<br><p style="color: #ff6b6b;">${warningHtml}</p>` : ""}
                         </div>
                         <div class="dialog-footer">
@@ -1075,16 +1403,17 @@
                     container.innerHTML = projects
                         .map(
                             (p) => `
-          <div class="project-card" onclick="location.href='/run/${p.slug}'">
+          <div class="project-card" data-slug="${p.slug}" onclick="handleProjectCardClick('${p.slug}')">
             <div class="project-header">
               <img class="project-icon" src="/api/sprite/${p.slug}/icon.png" alt="" onerror="this.style.display='none'" />
               <h3>${escapeHtml(p.name)}</h3>
               <div class="project-header-right">
+                <i class="fa fa-sticky-note note-icon ${p.hasNote ? "has-note" : ""}" onclick="event.stopPropagation(); toggleNote('${p.slug}')" title="Project note"></i>
                 <i class="fa fa-cog settings-icon" onclick="event.stopPropagation(); openConfigModal(${JSON.stringify(p).replace(/"/g, "&quot;")})" title="Configure project"></i>
                 <i class="fa fa-copy duplicate-icon" onclick="event.stopPropagation(); openDuplicatePreview('${p.slug}')" title="Duplicate project"></i>
                 <i class="fa fa-share export-icon" onclick="event.stopPropagation(); exportProject('${p.slug}')" title="Export to microStudio"></i>
                 <i class="fa fa-archive backup-icon" onclick="event.stopPropagation(); openBackupModal('${p.slug}')" title="Backup project"></i>
-                <i class="fa fa-trash delete-icon" onclick="event.stopPropagation(); openDeleteModal(${JSON.stringify(p).replace(/"/g, "&quot;")})" title="Delete project"></i>
+                <i class="fa fa-trash delete-icon" onclick="event.stopPropagation(); openDeleteModal('${p.slug}', '${(p.name || p.slug).replace(/'/g, "\\'")}')" title="Delete project"></i>
               </div>
             </div>
             <div class="project-details">
@@ -1096,8 +1425,14 @@
                 <span class="detail-label">Aspect:</span>
                 <span class="config-badge ${p.aspect || "free"}">${(p.aspect || "free").toUpperCase()}</span>
               </span>
+              <span class="detail-item">
+                <span class="detail-label">URL:</span>
+                <span class="config-badge url-value">/${p.slug}</span>
+                <i class="fa fa-copy copy-path-icon" title="Copy URL" data-url="/${p.slug}" onclick="copyProjectUrl(this); event.stopPropagation();"></i>
+              </span>
               <span class="detail-item project-path" title="${p.projectPath || ""}">
                 <span class="detail-label">Path:</span> <span class="config-badge path-value">${formatPathDisplay(p.projectPath)}</span>
+                <i class="fa fa-copy copy-path-icon" title="Copy path" data-path="${escapeHtml(p.projectPath)}" onclick="copyProjectPath(this); event.stopPropagation();"></i>
               </span>
             </div>
             <div class="project-footer">
@@ -1119,9 +1454,11 @@
 
             // Show Getting Started after a delay
             setTimeout(() => {
-                document.querySelectorAll('.help-section.hidden').forEach(el => {
-                    el.classList.add('visible');
-                });
+                document
+                    .querySelectorAll(".help-section.hidden")
+                    .forEach((el) => {
+                        el.classList.add("visible");
+                    });
             }, 500);
 
             function formatDate(dateString) {
@@ -1149,14 +1486,18 @@
             let currentProject = null;
             let originalSlug = null;
             let deleteProjectData = null;
+            let updateData = null;
 
             function openConfigModal(project) {
                 currentProject = project;
+                window.originalProjectSlug = project.slug;
                 originalSlug = project.slug;
                 document.getElementById("config-name").value =
                     project.name || project.slug;
                 document.getElementById("config-slug").value =
                     project.slug || project.slug;
+                document.getElementById("config-path").value =
+                    project.projectPath || "";
                 document.getElementById("config-slug").dataset.manual = "";
                 document.getElementById("config-orientation").value =
                     project.orientation || "any";
@@ -1164,20 +1505,38 @@
                     project.aspect || "free";
                 document.getElementById("config-sprite-direction").value =
                     project.spriteDirection || "vertical";
-                document.getElementById("slug-warning").style.display = "none";
+
+                document.getElementById("config-slug-status").textContent = "";
+                document.getElementById("config-slug-status").className =
+                    "form-hint";
+                document
+                    .getElementById("config-slug")
+                    .classList.remove("error");
+                document.getElementById("save-btn").disabled = false;
+
+                document.getElementById("config-slug-preview").textContent =
+                    window.location.origin + "/" + project.slug;
+
                 document.getElementById("config-modal").style.display = "flex";
+
+                const debouncedCheckSlug = debounce((slug) => {
+                    checkConfigSlugExists(slug);
+                }, 100);
 
                 document.getElementById("config-name").oninput = function (e) {
                     const slugField = document.getElementById("config-slug");
                     if (!slugField.dataset.manual) {
                         slugField.value = generateSlug(e.target.value);
                     }
-                    checkSlugChange();
+                    document.getElementById("config-slug-preview").textContent =
+                        window.location.origin + "/" + slugField.value;
                 };
 
                 document.getElementById("config-slug").oninput = function (e) {
                     e.target.dataset.manual = "true";
-                    checkSlugChange();
+                    document.getElementById("config-slug-preview").textContent =
+                        window.location.origin + "/" + e.target.value;
+                    debouncedCheckSlug(e.target.value.trim());
                 };
             }
 
@@ -1187,21 +1546,200 @@
                 originalSlug = null;
             }
 
+            function openDeleteModal(slug, name) {
+                currentProject = { slug, name };
+                document.getElementById("delete-project-name").textContent =
+                    name;
+                document.getElementById("delete-modal").style.display = "flex";
+            }
+
+            function closeDeleteModal() {
+                document.getElementById("delete-modal").style.display = "none";
+                currentProject = null;
+            }
+
+            async function deleteProject() {
+                if (!currentProject) return;
+
+                const btn = document.getElementById("delete-btn");
+                btn.disabled = true;
+                btn.textContent = "Deleting...";
+
+                try {
+                    const res = await fetch(
+                        "/api/project/" + currentProject.slug,
+                        {
+                            method: "DELETE",
+                        },
+                    );
+
+                    const result = await res.json();
+                    if (result.success) {
+                        closeDeleteModal();
+                        loadProjects();
+                    } else {
+                        showModal(
+                            "Error",
+                            result.error || "Failed to delete",
+                            "error",
+                        );
+                    }
+                } catch (e) {
+                    showModal(
+                        "Error",
+                        "Failed to delete: " + e.message,
+                        "error",
+                    );
+                } finally {
+                    btn.disabled = false;
+                    btn.textContent = "Delete";
+                }
+            }
+
+            document
+                .getElementById("delete-modal")
+                .addEventListener("click", function (e) {
+                    if (e.target === this) closeDeleteModal();
+                });
+
+            async function checkCreateSlugExists(slug) {
+                try {
+                    const res = await fetch(
+                        "/api/slug-exists?slug=" + encodeURIComponent(slug),
+                    );
+                    const data = await res.json();
+
+                    const statusEl =
+                        document.getElementById("create-slug-status");
+                    const slugInput = document.getElementById("create-slug");
+                    const createBtn = document.getElementById("create-btn");
+
+                    if (data.exists) {
+                        statusEl.textContent =
+                            "A project with this slug already exists";
+                        statusEl.className = "form-hint slug-exists";
+                        slugInput.classList.add("error");
+                        createBtn.disabled = true;
+                    } else {
+                        statusEl.textContent = "";
+                        statusEl.className = "form-hint";
+                        slugInput.classList.remove("error");
+                        createBtn.disabled = false;
+                    }
+                } catch (err) {
+                    // Silently fail - slug check is non-critical
+                }
+            }
+
+            async function checkConfigSlugExists(slug) {
+                const originalSlug = window.originalProjectSlug;
+
+                if (slug === originalSlug) {
+                    const statusEl =
+                        document.getElementById("config-slug-status");
+                    const slugInput = document.getElementById("config-slug");
+                    const saveBtn = document.getElementById("save-btn");
+                    statusEl.textContent = "";
+                    statusEl.className = "form-hint";
+                    slugInput.classList.remove("error");
+                    saveBtn.disabled = false;
+                    return;
+                }
+
+                try {
+                    const res = await fetch(
+                        "/api/slug-exists?slug=" + encodeURIComponent(slug),
+                    );
+                    const data = await res.json();
+
+                    const statusEl =
+                        document.getElementById("config-slug-status");
+                    const slugInput = document.getElementById("config-slug");
+                    const saveBtn = document.getElementById("save-btn");
+
+                    if (data.exists) {
+                        statusEl.textContent =
+                            "A project with this slug already exists";
+                        statusEl.className = "form-hint slug-exists";
+                        slugInput.classList.add("error");
+                        saveBtn.disabled = true;
+                    } else {
+                        statusEl.textContent = "";
+                        statusEl.className = "form-hint";
+                        slugInput.classList.remove("error");
+                        saveBtn.disabled = false;
+                    }
+                } catch (err) {
+                    // Silently fail - slug check is non-critical
+                }
+            }
+
+            function debounce(func, wait) {
+                let timeout;
+                return function executedFunction(...args) {
+                    const later = () => {
+                        clearTimeout(timeout);
+                        func(...args);
+                    };
+                    clearTimeout(timeout);
+                    timeout = setTimeout(later, wait);
+                };
+            }
+
+            const updateSlugAndPath = debounce(async function () {
+                const pathInput = document.getElementById("create-path");
+                const name = document
+                    .getElementById("create-name")
+                    .value.trim();
+                const slugInput = document.getElementById("create-slug");
+                const currentSlugValue = slugInput.value.trim();
+                const isSlugFocused = document.activeElement === slugInput;
+
+                const slug =
+                    isSlugFocused && currentSlugValue
+                        ? currentSlugValue
+                        : generateSlug(name) || "my-awesome-game";
+
+                if (!isSlugFocused) {
+                    slugInput.value = slug;
+                }
+
+                document.getElementById("create-slug-preview").textContent =
+                    window.location.origin + "/" + slug;
+
+                const isPathFocused = document.activeElement === pathInput;
+                const hasManualFlag = pathInput.dataset.manual === "true";
+
+                if (!pathInput.value || (!hasManualFlag && !isPathFocused)) {
+                    try {
+                        const [docsRes, folderRes] = await Promise.all([
+                            fetch("/api/documents-path"),
+                            fetch(
+                                "/api/unique-folder-name?slug=" +
+                                    encodeURIComponent(slug),
+                            ),
+                        ]);
+                        if (docsRes.ok && folderRes.ok) {
+                            const docsData = await docsRes.json();
+                            const folderData = await folderRes.json();
+                            pathInput.value =
+                                docsData.path + "/" + folderData.folderName;
+                        }
+                    } catch (err) {
+                        console.error("Failed to update path:", err);
+                    }
+                }
+
+                if (slug) {
+                    checkCreateSlugExists(slug);
+                }
+            }, 500);
+
             function generateSlug(name) {
                 return name
                     .toLowerCase()
                     .replace(/\s+/g, "-")
                     .replace(/[^a-z0-9-]/g, "");
-            }
-
-            function checkSlugChange() {
-                const newSlug = document.getElementById("config-slug").value;
-                const warning = document.getElementById("slug-warning");
-                if (originalSlug && newSlug !== originalSlug) {
-                    warning.style.display = "block";
-                } else {
-                    warning.style.display = "none";
-                }
             }
 
             async function saveConfig() {
@@ -1221,144 +1759,94 @@
                 ).value;
 
                 if (!newName || !newSlug) {
-                    alert("Name and slug are required");
+                    showModal(
+                        "Validation Error",
+                        "Name and slug are required",
+                        "error",
+                    );
                     return;
                 }
 
-                const btn = document.getElementById("save-btn");
-                btn.disabled = true;
-                btn.textContent = "Saving...";
+                const saveBtn = document.getElementById("save-btn");
+                saveBtn.disabled = true;
+                saveBtn.textContent = "Saving...";
 
                 try {
-                    const res = await fetch(
-                        `/api/project/${currentProject.slug}/config`,
-                        {
-                            method: "PUT",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({
-                                name: newName,
-                                slug: newSlug,
-                                orientation: orientation,
-                                aspect: aspect,
-                                spriteDirection: spriteDirection,
-                            }),
-                        },
-                    );
+                    const res = await fetch("/api/project/config", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            slug: currentProject.slug,
+                            newName,
+                            newSlug,
+                            orientation,
+                            aspect,
+                            spriteDirection,
+                        }),
+                    });
 
                     const result = await res.json();
                     if (result.success) {
                         closeConfigModal();
                         loadProjects();
+                        showNotification("Project saved!");
                     } else {
-                        alert(
-                            "Failed to save: " +
-                                (result.error || "Unknown error"),
+                        showModal(
+                            "Error",
+                            result.error || "Failed to save",
+                            "error",
                         );
                     }
                 } catch (e) {
-                    alert("Failed to save: " + e.message);
+                    showModal("Error", "Failed to save: " + e.message, "error");
                 } finally {
-                    btn.disabled = false;
-                    btn.textContent = "Save";
+                    saveBtn.disabled = false;
+                    saveBtn.textContent = "Save";
                 }
             }
-
-            document
-                .getElementById("config-modal")
-                .addEventListener("click", function (e) {
-                    if (e.target === this) closeConfigModal();
-                });
-
-            function openDeleteModal(project) {
-                deleteProjectData = project;
-                document.getElementById("delete-project-name").textContent =
-                    project.name || project.slug;
-                document.getElementById("delete-modal").style.display = "flex";
-            }
-
-            function closeDeleteModal() {
-                document.getElementById("delete-modal").style.display = "none";
-                deleteProjectData = null;
-            }
-
-            async function deleteProject() {
-                if (!deleteProjectData) {
-                    console.error("No project selected for deletion");
-                    return;
-                }
-
-                const btn = document.getElementById("delete-btn");
-                btn.disabled = true;
-                btn.textContent = "Deleting...";
-
-                try {
-                    const res = await fetch(
-                        `/api/project/${deleteProjectData.slug}`,
-                        {
-                            method: "DELETE",
-                        },
-                    );
-
-                    const result = await res.json();
-
-                    if (result.success) {
-                        closeDeleteModal();
-                        loadProjects();
-                    } else {
-                        alert(
-                            "Failed to delete: " +
-                                (result.error || "Unknown error"),
-                        );
-                    }
-                } catch (e) {
-                    console.error("Delete error:", e);
-                    alert("Failed to delete: " + e.message);
-                } finally {
-                    btn.disabled = false;
-                    btn.textContent = "Delete";
-                }
-            }
-
-            document
-                .getElementById("delete-modal")
-                .addEventListener("click", function (e) {
-                    if (e.target === this) closeDeleteModal();
-                });
 
             function openCreateModal() {
                 document.getElementById("create-name").value = "";
+                document.getElementById("create-slug").value = "";
+                document.getElementById("create-slug-preview").textContent =
+                    window.location.origin + "/";
+                document.getElementById("create-slug-status").textContent = "";
+                document.getElementById("create-slug-status").className =
+                    "form-hint";
+                document
+                    .getElementById("create-slug")
+                    .classList.remove("error");
+                document.getElementById("create-btn").disabled = false;
                 const pathInput = document.getElementById("create-path");
                 delete pathInput.dataset.manual;
                 document.getElementById("create-orientation").value = "any";
                 document.getElementById("create-aspect").value = "free";
                 document.getElementById("create-modal").style.display = "flex";
 
+                setTimeout(() => {
+                    document.getElementById("create-name").focus();
+                }, 50);
+
                 document.getElementById("create-path").oninput = function (e) {
                     e.target.dataset.manual = "true";
                 };
 
+                document.getElementById("create-name").oninput =
+                    updateSlugAndPath;
+                document.getElementById("create-slug").oninput =
+                    updateSlugAndPath;
+
                 // Set default path when modal opens
                 (async () => {
-                    try {
-                        // Only set if path is empty AND not manually edited
-                        if (!pathInput.value && !pathInput.dataset.manual) {
-                            const res = await fetch("/api/default-path?name=");
-                            if (res.ok) {
-                                const data = await res.json();
-                                pathInput.value = data.path || "";
-                            }
-                        }
-                    } catch (err) {
-                        console.error("Failed to get default path:", err);
-                    }
+                    await updateSlugAndPath();
                 })();
             }
 
-            async function pickFolder() {
+            async function pickFolder(inputId = "create-path") {
                 const btn = document
-                    .getElementById("create-path")
+                    .getElementById(inputId)
                     .parentElement.querySelector("button");
-                const input = document.getElementById("create-path");
+                const input = document.getElementById(inputId);
 
                 btn.disabled = true;
                 btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i>';
@@ -1399,6 +1887,7 @@
                 const name = document
                     .getElementById("create-name")
                     .value.trim();
+                let slug = document.getElementById("create-slug").value.trim();
                 const path = document
                     .getElementById("create-path")
                     .value.trim();
@@ -1416,6 +1905,10 @@
                         "error",
                     );
                     return;
+                }
+
+                if (!slug) {
+                    slug = generateSlug(name);
                 }
 
                 if (!path) {
@@ -1437,6 +1930,7 @@
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({
                             name,
+                            slug,
                             path,
                             orientation,
                             aspect,
@@ -1449,13 +1943,28 @@
                         closeCreateModal();
                         loadProjects();
                     } else {
-                        alert(
-                            "Failed to create: " +
-                                (result.error || "Unknown error"),
+                        let message = result.error || "Unknown error";
+                        if (result.existingPath) {
+                            message += `<br><br>Existing project: <code>${result.existingPath}</code>`;
+                        }
+                        if (result.parentPath) {
+                            message += `<br><br>Parent directory: <code>${result.parentPath}</code>`;
+                        }
+                        showModal(
+                            "Validation Error",
+                            message,
+                            "error",
+                            null,
+                            null,
+                            true,
                         );
                     }
                 } catch (e) {
-                    alert("Failed to create: " + e.message);
+                    showModal(
+                        "Error",
+                        "Failed to create: " + e.message,
+                        "error",
+                    );
                 } finally {
                     btn.disabled = false;
                     btn.textContent = "Create";
@@ -1504,8 +2013,6 @@
                 document.body.removeChild(link);
             }
 
-            let updateData = null;
-
             async function checkUpdate() {
                 const btn = document.getElementById("update-btn");
                 const btnText = document.getElementById("update-btn-text");
@@ -1550,7 +2057,7 @@
                             return;
                         }
                         showUpdateInfo();
-                    }, 500);
+                    }, 100);
                     return;
                 }
                 showUpdateInfo();
@@ -1737,13 +2244,11 @@
                 stoppedDiv.innerHTML = `
                     <h4 style="margin: 0 0 12px 0; color: var(--color-accent);">Update Complete</h4>
                     <p style="margin: 0 0 12px 0; line-height: 1.6;">
-                        The update has been installed from the main branch.
+                        The update has been installed from the main branch. The server is restarting automatically.
                     </p>
-                    <p style="margin: 0 0 8px 0; line-height: 1.6;">
-                        <strong>To continue, run:</strong>
+                    <p style="margin: 0 0 8px 0; line-height: 1.6; color: var(--color-textSecondary);">
+                        <i class="fa fa-refresh"></i> Please wait, the server will restart in a few seconds...
                     </p>
-                    <code style="display: block; background: var(--color-darkBg); padding: 12px; border-radius: 4px; margin-bottom: 12px; white-space: pre;">npm install
-npm start</code>
                     <p style="margin: 0; font-size: 12px; color: var(--color-textSecondary);">
                         <i class="fa fa-folder-open"></i> Your projects and backups are preserved.
                     </p>
@@ -1760,6 +2265,278 @@ npm start</code>
                 .addEventListener("click", function (e) {
                     if (e.target === this) closeUpdateModal();
                 });
+
+            function showNotification(message) {
+                const notification =
+                    document.getElementById("notification-toast");
+                notification.textContent = message;
+                notification.classList.add("show");
+                setTimeout(() => {
+                    notification.classList.remove("show");
+                }, 1500);
+            }
+
+            function copyProjectPath(element) {
+                const path = element.dataset.path;
+                if (path) {
+                    navigator.clipboard.writeText(path).then(() => {
+                        showNotification("Path copied!");
+                    });
+                }
+            }
+
+            function copyProjectUrl(element) {
+                const url = window.location.origin + element.dataset.url;
+                if (url) {
+                    navigator.clipboard.writeText(url).then(() => {
+                        showNotification("URL copied!");
+                    });
+                }
+            }
+
+            let noteCache = new Map();
+
+            async function toggleNote(slug) {
+                const card = document.querySelector(
+                    `.project-card[data-slug="${slug}"]`,
+                );
+                if (!card) return;
+
+                if (card.classList.contains("note-mode")) {
+                    await handleNoteCancel(slug);
+                } else {
+                    await enterNoteMode(slug);
+                }
+            }
+
+            async function enterNoteMode(slug) {
+                const card = document.querySelector(
+                    `.project-card[data-slug="${slug}"]`,
+                );
+                if (!card || card.classList.contains("note-mode")) return;
+
+                let noteContent = noteCache.get(slug);
+                if (noteContent === undefined) {
+                    try {
+                        const res = await fetch(`/api/project/${slug}/note`);
+                        const data = await res.json();
+                        noteContent = data.note || "";
+                        noteCache.set(slug, noteContent);
+                    } catch (e) {
+                        console.error("Failed to load note:", e);
+                        noteContent = "";
+                    }
+                }
+
+                card.dataset.originalNote = noteContent;
+                card.dataset.slug = slug;
+
+                card.innerHTML = `
+                    <div class="note-header">
+                        <img class="note-project-icon" src="/api/sprite/${slug}/icon.png" alt="" onerror="this.style.display='none'" />
+                        <span class="note-project-name">${escapeHtml(card.querySelector("h3")?.textContent || "")}</span>
+                        <i class="fa fa-expand note-expand-icon" onclick="event.stopPropagation(); expandNote('${slug}')" title="Expand to full screen"></i>
+                    </div>
+                    <textarea class="note-textarea" placeholder="Write your note here...">${escapeHtml(noteContent)}</textarea>
+                    <div class="note-buttons">
+                        <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); handleNoteCancel('${slug}')">Cancel</button>
+                        <button class="btn btn-primary btn-sm" onclick="event.stopPropagation(); saveNote('${slug}')">Save</button>
+                    </div>
+                `;
+                card.classList.add("note-mode");
+
+                const textarea = card.querySelector(".note-textarea");
+                if (textarea) {
+                    textarea.focus();
+                }
+            }
+
+            async function handleNoteCancel(slug) {
+                const card = document.querySelector(
+                    `.project-card[data-slug="${slug}"]`,
+                );
+                if (!card || !card.classList.contains("note-mode")) return;
+
+                const textarea = card.querySelector(".note-textarea");
+                const currentContent = textarea ? textarea.value : "";
+                const originalContent = card.dataset.originalNote || "";
+
+                if (currentContent !== originalContent) {
+                    showModal(
+                        "Unsaved Changes",
+                        "You have unsaved changes. Do you want to discard them?",
+                        "warning",
+                        null,
+                        { text: "Discard", action: () => exitNoteMode(slug) },
+                        false,
+                    );
+                    return;
+                }
+
+                exitNoteMode(slug);
+            }
+
+            function exitNoteMode(slug) {
+                const card = document.querySelector(
+                    `.project-card[data-slug="${slug}"]`,
+                );
+                if (!card) return;
+
+                card.classList.remove("note-mode");
+                delete card.dataset.originalNote;
+                delete card.dataset.slug;
+
+                loadProjects();
+            }
+
+            async function saveNote(slug) {
+                const card = document.querySelector(
+                    `.project-card[data-slug="${slug}"]`,
+                );
+                if (!card) return;
+
+                const textarea = card.querySelector(".note-textarea");
+                const content = textarea ? textarea.value : "";
+
+                try {
+                    const res = await fetch(`/api/project/${slug}/note`, {
+                        method: "PUT",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ note: content }),
+                    });
+
+                    if (res.ok) {
+                        noteCache.set(slug, content);
+                        showNotification("Note saved!");
+                        exitNoteMode(slug);
+                    } else {
+                        showModal("Error", "Failed to save note", "error");
+                    }
+                } catch (e) {
+                    showModal(
+                        "Error",
+                        "Failed to save note: " + e.message,
+                        "error",
+                    );
+                }
+            }
+
+            function expandNote(slug) {
+                const card = document.querySelector(
+                    `.project-card[data-slug="${slug}"]`,
+                );
+                if (!card) return;
+
+                const textarea = card.querySelector(".note-textarea");
+                const content = textarea ? textarea.value : "";
+                const projectName =
+                    card.querySelector(".note-project-name")?.textContent || "";
+
+                const overlay = document.createElement("div");
+                overlay.className = "note-expand-overlay";
+                overlay.innerHTML = `
+                    <div class="note-expand-modal">
+                        <div class="note-expand-header">
+                            <div class="note-expand-title-group">
+                                <img class="note-expand-project-icon" src="/api/sprite/${slug}/icon.png" alt="" onerror="this.style.display='none'" />
+                                <span class="note-expand-project-name">${escapeHtml(projectName)}</span>
+                            </div>
+                            <i class="fa fa-compress note-compress-icon" onclick="closeNoteExpand()" title="Restore"></i>
+                        </div>
+                        <textarea class="note-expand-textarea" placeholder="Write your note here (Markdown supported)...">${escapeHtml(content)}</textarea>
+                        <div class="note-expand-buttons">
+                            <button class="btn btn-secondary" onclick="closeNoteExpand()">Cancel</button>
+                            <button class="btn btn-primary" onclick="saveNoteExpand('${slug}')">Save</button>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(overlay);
+
+                const expandTextarea = overlay.querySelector(
+                    ".note-expand-textarea",
+                );
+                if (expandTextarea) {
+                    expandTextarea.focus();
+                }
+
+                overlay.onclick = (e) => {
+                    if (e.target === overlay) closeNoteExpand();
+                };
+
+                window.currentNoteOverlay = overlay;
+                window.currentNoteSlug = slug;
+            }
+
+            function closeNoteExpand() {
+                if (window.currentNoteOverlay) {
+                    const overlay = window.currentNoteOverlay;
+                    const textarea = overlay.querySelector(
+                        ".note-expand-textarea",
+                    );
+                    window.expandedNoteContent = textarea ? textarea.value : "";
+                    overlay.remove();
+                    window.currentNoteOverlay = null;
+
+                    const slug = window.currentNoteSlug;
+                    if (slug) {
+                        const card = document.querySelector(
+                            `.project-card[data-slug="${slug}"]`,
+                        );
+                        if (card && card.classList.contains("note-mode")) {
+                            const cardTextarea =
+                                card.querySelector(".note-textarea");
+                            if (
+                                cardTextarea &&
+                                window.expandedNoteContent !== undefined
+                            ) {
+                                cardTextarea.value = window.expandedNoteContent;
+                            }
+                        }
+                    }
+                }
+            }
+
+            async function saveNoteExpand(slug) {
+                const overlay = window.currentNoteOverlay;
+                if (!overlay) return;
+
+                const textarea = overlay.querySelector(".note-expand-textarea");
+                const content = textarea ? textarea.value : "";
+
+                try {
+                    const res = await fetch(`/api/project/${slug}/note`, {
+                        method: "PUT",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ note: content }),
+                    });
+
+                    if (res.ok) {
+                        noteCache.set(slug, content);
+                        showNotification("Note saved!");
+                        closeNoteExpand();
+                        exitNoteMode(slug);
+                    } else {
+                        showModal("Error", "Failed to save note", "error");
+                    }
+                } catch (e) {
+                    showModal(
+                        "Error",
+                        "Failed to save note: " + e.message,
+                        "error",
+                    );
+                }
+            }
+
+            function handleProjectCardClick(slug) {
+                const card = document.querySelector(
+                    `.project-card[data-slug="${slug}"]`,
+                );
+                if (card && card.classList.contains("note-mode")) {
+                    return;
+                }
+                location.href = "/" + slug;
+            }
         </script>
+        <div id="notification-toast" class="notification-toast"></div>
     </body>
 </html>

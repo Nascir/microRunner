@@ -7,6 +7,8 @@ const chokidar = require('chokidar');
 const { exec } = require('child_process');
 const backup = require('./src/backup.js');
 const config = require('./src/config.js');
+const trash = require('./src/trash.js');
+const note = require('./src/note.js');
 
 const PORT = process.env.PORT || 3000;
 
@@ -140,6 +142,7 @@ async function getProjects() {
       try {
         const projectConfig = await config.read(projectPath);
         const mtime = getLatestMtime(projectPath);
+        const hasNote = note.noteExists(projectPath);
         return {
           name: projectConfig.meta.name,
           slug: projectConfig.meta.slug,
@@ -147,6 +150,7 @@ async function getProjects() {
           aspect: projectConfig.settings.aspect,
           projectPath: proj.path,
           lastUpdated: mtime > 0 ? new Date(mtime) : null,
+          hasNote,
         };
       } catch (e) {
         console.warn(`Failed to read project.toml for ${proj.slug}:`, e.message);
@@ -303,6 +307,7 @@ async function watchProject(slug) {
   const watcher = chokidar.watch(msDir, {
     ignored: /^\./,
     persistent: true,
+    ignoreInitial: true,
   });
 
   watcher.on('change', async (filePath) => {
@@ -360,6 +365,7 @@ async function watchSprites(slug) {
   const watcher = chokidar.watch(spritesDir, {
     ignored: /^\./,
     persistent: true,
+    ignoreInitial: true,
   });
 
   watcher.on('add', (filePath) => handleSpriteChange(slug, 'add', filePath));
@@ -536,42 +542,163 @@ app.put('/api/project/:name/config', async (req, res) => {
 app.post('/api/projects', async (req, res) => {
   const { name, slug, orientation, aspect, spriteDirection, path: customPath } = req.body;
 
-  if (!name) {
+  if (!name || !name.trim()) {
     return res.status(400).json({ error: 'Project name is required' });
   }
 
-  const generateSlug = (n) =>
-    n
-      .toLowerCase()
-      .replace(/\s+/g, '-')
-      .replace(/[^a-z0-9-]/g, '');
-  const baseSlug = slug || generateSlug(name);
-  let projectSlug = baseSlug;
-
-  let projectPath;
-  if (customPath) {
-    projectPath = customPath;
-    projectSlug = path.basename(projectPath);
-  } else {
-    projectPath = await config.generateDefaultProjectPath(baseSlug);
-    projectSlug = path.basename(projectPath);
+  if (!slug || !slug.trim()) {
+    return res.status(400).json({ error: 'Project slug is required' });
   }
 
+  const slugRegex = /^[a-z0-9-]+$/;
+  if (!slugRegex.test(slug)) {
+    return res.status(400).json({ error: 'Slug can only contain lowercase letters, numbers, and hyphens' });
+  }
+
+  const registry = await config.readProjectsToml();
+  const existingProject = registry.projects?.paths?.find(p => p.slug === slug);
+  if (existingProject) {
+    return res.status(400).json({ error: 'A project with this slug already exists', existingPath: existingProject.path });
+  }
+
+  if (!customPath || !customPath.trim()) {
+    return res.status(400).json({ error: 'Project path is required' });
+  }
+
+  const isAbsolute = path.isAbsolute(customPath);
+  if (!isAbsolute) {
+    return res.status(400).json({ error: 'Path must be an absolute path' });
+  }
+
+  const parentDir = path.dirname(customPath);
+  if (!fs.existsSync(parentDir)) {
+    return res.status(400).json({ error: 'Parent directory does not exist', parentPath: parentDir });
+  }
+
+  const folderExists = fs.existsSync(customPath);
+
+  let projectPath = customPath;
+
   try {
-    ensureProjectStructure(projectPath, projectSlug, {
+    ensureProjectStructure(projectPath, slug, {
       name: name,
       orientation: orientation || 'any',
       aspect: aspect || 'free',
       spriteDirection: spriteDirection || 'vertical',
     });
 
-    await config.addProject(projectSlug, projectPath);
+    await config.addProject(slug, projectPath);
 
-    res.json({ success: true, slug: projectSlug, path: projectPath });
+    res.json({ success: true, slug: slug, path: projectPath });
   } catch (e) {
     console.error('Failed to create project:', e);
     res.status(500).json({ error: 'Failed to create project' });
   }
+});
+
+app.post('/api/project/open', async (req, res) => {
+  const { path: projectPath } = req.body;
+
+  console.log('[Open Project] Received path:', projectPath);
+
+  if (!projectPath) {
+    console.log('[Open Project] No path provided');
+    return res.status(400).json({ success: false, error: 'No path provided' });
+  }
+
+  if (!fs.existsSync(projectPath)) {
+    console.log('[Open Project] Folder does not exist:', projectPath);
+    return res.json({ success: false, error: 'Folder does not exist' });
+  }
+
+  const tomlPath = path.join(projectPath, 'project.toml');
+  console.log('[Open Project] Checking for TOML at:', tomlPath);
+  if (!fs.existsSync(tomlPath)) {
+    return res.json({
+      success: false,
+      error: 'Missing project.toml - not a microRunner project',
+    });
+  }
+
+  const msPath = path.join(projectPath, 'ms');
+  console.log('[Open Project] Checking for ms/ at:', msPath);
+  if (!fs.existsSync(msPath)) {
+    return res.json({
+      success: false,
+      error: 'Missing ms/ directory - not a valid microRunner project',
+    });
+  }
+
+  let projectConfig;
+  try {
+    projectConfig = await config.read(projectPath);
+    console.log('[Open Project] Config loaded, slug:', projectConfig.meta?.slug);
+  } catch (e) {
+    console.log('[Open Project] Invalid TOML:', e.message);
+    return res.json({
+      success: false,
+      error: 'Invalid project.toml format',
+    });
+  }
+
+  const originalSlug = projectConfig.meta?.slug;
+  if (!originalSlug) {
+    return res.json({
+      success: false,
+      error: 'Missing slug in project.toml',
+    });
+  }
+
+  async function generateUniqueSlug(baseSlug) {
+    let counter = 1;
+    let newSlug = baseSlug;
+    while (await config.getProjectPath(newSlug)) {
+      newSlug = `${baseSlug}-${counter}`;
+      counter++;
+    }
+    return newSlug;
+  }
+
+  const existingPath = await config.getProjectPath(originalSlug);
+  console.log('[Open Project] Existing path for slug:', existingPath);
+
+  if (existingPath === projectPath) {
+    console.log('[Open Project] Same project already registered');
+    return res.json({ success: true, alreadyExists: true, slug: originalSlug });
+  }
+
+  if (existingPath) {
+    console.log('[Open Project] Slug conflict, generating unique slug');
+    const newSlug = await generateUniqueSlug(originalSlug);
+    console.log('[Open Project] New slug:', newSlug);
+
+    projectConfig.meta.slug = newSlug;
+    try {
+      await config.write(projectPath, projectConfig);
+      console.log('[Open Project] Updated project.toml with new slug');
+    } catch (e) {
+      console.log('[Open Project] Failed to update project.toml:', e.message);
+      return res.json({
+        success: false,
+        error: 'Failed to update project.toml: ' + e.message,
+      });
+    }
+
+    await config.addProject(newSlug, projectPath);
+    console.log('[Open Project] Added project with new slug:', newSlug);
+
+    return res.json({
+      success: true,
+      slugChanged: true,
+      oldSlug: originalSlug,
+      newSlug: newSlug,
+    });
+  }
+
+  await config.addProject(originalSlug, projectPath);
+  console.log('[Open Project] Successfully added project:', originalSlug);
+
+  res.json({ success: true, slug: originalSlug });
 });
 
 app.delete('/api/project/:name', async (req, res) => {
@@ -583,12 +710,56 @@ app.delete('/api/project/:name', async (req, res) => {
   }
 
   try {
-    fs.rmSync(projectPath, { recursive: true, force: true });
+    await trash.moveToTrash(projectPath, slug);
     await config.removeProject(slug);
     res.json({ success: true });
   } catch (e) {
     console.error('Failed to delete project:', e);
     res.status(500).json({ error: 'Failed to delete project' });
+  }
+});
+
+app.post('/api/project/config', async (req, res) => {
+  const { slug, newName, newSlug, orientation, aspect, spriteDirection } = req.body;
+
+  if (!slug || !newName || !newSlug) {
+    return res.status(400).json({ error: 'Missing required fields' });
+  }
+
+  if (slug !== newSlug) {
+    const registry = await config.readProjectsToml();
+    const existing = registry.projects?.paths?.find(p => p.slug === newSlug);
+    if (existing) {
+      return res.status(400).json({ error: 'A project with this slug already exists' });
+    }
+  }
+
+  const projectPath = await config.getProjectPath(slug);
+  if (!projectPath) {
+    return res.status(404).json({ error: 'Project not found' });
+  }
+
+  const projectTomlPath = path.join(projectPath, 'project.toml');
+
+  try {
+    const projectConfig = await config.read(projectTomlPath);
+
+    projectConfig.name = newName;
+    projectConfig.orientation = orientation;
+    projectConfig.aspect = aspect;
+    projectConfig.spriteDirection = spriteDirection;
+
+    if (slug !== newSlug) {
+      projectConfig.slug = newSlug;
+      await config.updateProjectSlug(slug, newSlug);
+    }
+
+    await config.write(projectTomlPath, projectConfig);
+
+    res.json({ success: true });
+  } catch (e) {
+    console.error('Failed to save config:', e);
+    res.status(500).json({ error: 'Failed to save configuration' });
   }
 });
 
@@ -957,7 +1128,57 @@ app.delete('/api/project/:name/backups/:file/note', async (req, res) => {
   }
 });
 
-app.get('/run/:project', (req, res) => {
+app.get('/api/project/:name/note', async (req, res) => {
+  const { name } = req.params;
+  try {
+    const projectPath = await config.getProjectPath(name);
+    if (!projectPath) {
+      return res.status(404).json({ error: 'Project not found' });
+    }
+    const content = await note.readNote(projectPath);
+    res.json({ note: content });
+  } catch (e) {
+    console.error('Failed to read note:', e);
+    res.status(500).json({ error: 'Failed to read note' });
+  }
+});
+
+app.put('/api/project/:name/note', async (req, res) => {
+  const { name } = req.params;
+  const { note: noteContent } = req.body;
+  try {
+    const projectPath = await config.getProjectPath(name);
+    if (!projectPath) {
+      return res.status(404).json({ error: 'Project not found' });
+    }
+    await note.writeNote(projectPath, noteContent || '');
+    res.json({ success: true });
+  } catch (e) {
+    console.error('Failed to save note:', e);
+    res.status(500).json({ error: 'Failed to save note' });
+  }
+});
+
+app.delete('/api/project/:name/note', async (req, res) => {
+  const { name } = req.params;
+  try {
+    const projectPath = await config.getProjectPath(name);
+    if (!projectPath) {
+      return res.status(404).json({ error: 'Project not found' });
+    }
+    await note.deleteNote(projectPath);
+    res.json({ success: true });
+  } catch (e) {
+    console.error('Failed to delete note:', e);
+    res.status(500).json({ error: 'Failed to delete note' });
+  }
+});
+
+app.get('/:project', (req, res) => {
+  const project = req.params.project;
+  if (project === 'api' || project === 'static' || project.startsWith('api.') || project === 'favicon.ico') {
+    return res.status(404).send('Not found');
+  }
   res.sendFile(path.join(__dirname, 'static', 'game.html'));
 });
 
@@ -967,6 +1188,30 @@ app.get('/api/default-path', async (req, res) => {
   const slug = baseName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
   const defaultPath = await config.generateDefaultProjectPath(slug);
   res.json({ path: defaultPath });
+});
+
+app.get('/api/unique-folder-name', async (req, res) => {
+  const { slug } = req.query;
+  if (!slug) {
+    return res.json({ folderName: 'Project' });
+  }
+  const folderName = config.generateUniqueFolderName(slug);
+  res.json({ folderName });
+});
+
+app.get('/api/slug-exists', async (req, res) => {
+  const { slug } = req.query;
+  if (!slug) {
+    return res.json({ exists: false });
+  }
+  const registry = await config.readProjectsToml();
+  const exists = registry.projects?.paths?.some(p => p.slug === slug);
+  res.json({ exists, slug });
+});
+
+app.get('/api/documents-path', async (req, res) => {
+  const documentsPath = config.getDocumentsPath();
+  res.json({ path: documentsPath });
 });
 
 app.get('/api/system/pick-folder', (req, res) => {
@@ -1091,6 +1336,7 @@ app.get('/api/update/download', async (req, res) => {
     'temp_update_',
     'temp_extract_',
     'logs',
+    'trash',
   ];
 
   function shouldExclude(filePath) {
@@ -1299,20 +1545,41 @@ app.get('/api/update/download', async (req, res) => {
     if (fs.existsSync(tempDir))
       fs.rmSync(tempDir, { recursive: true, force: true });
 
-    console.log('\n🔄 Update complete. Server stopped.');
-    console.log('📝 Run \'npm install\' then \'npm start\' to continue.\n');
+    console.log('\n🔄 Update complete.');
 
-    setTimeout(() => {
-      res.end();
-      server.close(() => {
-        console.log('Server closed gracefully');
-        process.exit(0);
-      });
+    const isDevMode = process.argv.some(arg => arg.includes('nodemon'));
+
+    if (isDevMode) {
+      console.log('Please restart dev server manually (npm run dev)');
       setTimeout(() => {
-        console.log('Forcing server shutdown...');
-        process.exit(0);
-      }, 5000);
-    }, 2000);
+        res.end();
+        server.close(() => {
+          process.exit(0);
+        });
+        setTimeout(() => {
+          process.exit(0);
+        }, 5000);
+      }, 2000);
+    } else {
+      const restartScript = path.join(__dirname, 'restart.js');
+      const child = spawn('node', [restartScript], {
+        cwd: __dirname,
+        stdio: 'ignore',
+        detached: true
+      });
+      child.unref();
+
+      setTimeout(() => {
+        res.end();
+        server.close(() => {
+          process.exit(0);
+        });
+        setTimeout(() => {
+          console.log('Forcing shutdown (restart may be incomplete)...');
+          process.exit(0);
+        }, 5000);
+      }, 2000);
+    }
   } catch (e) {
     sendProgress('Error: ' + e.message, 0);
     if (fs.existsSync(tempZip)) fs.unlinkSync(tempZip);
@@ -1320,6 +1587,17 @@ app.get('/api/update/download', async (req, res) => {
     res.end();
   }
 });
+
+(async () => {
+  try {
+    const count = trash.emptyExpiredTrash();
+    if (count > 0) {
+      console.log(`[Trash] Permanently deleted ${count} expired project(s)`);
+    }
+  } catch (e) {
+    console.error('[Trash] Cleanup failed:', e.message);
+  }
+})();
 
 watchAllProjects();
 
