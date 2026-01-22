@@ -7,7 +7,7 @@
   <title>microRunner - Loading...</title>
   <link rel="stylesheet" href="/css/fonts.css">
   <link rel="stylesheet" href="/css/terminal.css">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
   <style>
     * {
       box-sizing: border-box;
@@ -37,6 +37,22 @@
       padding: 10px 20px;
       background: var(--color-cardBg);
       border-bottom: 1px solid var(--color-border);
+      position: relative;
+    }
+
+    .header h1 {
+      margin: 0;
+      font-size: 1.2rem;
+      color: var(--color-accent);
+    }
+
+    .control-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
     }
 
     .header h1 {
@@ -404,7 +420,6 @@
         </button>
         <span id="execution-status" class="status-indicator status-running">RUNNING</span>
       </div>
-      <a href="/"><i class="fas fa-arrow-left"></i> Back to Projects</a>
     </div>
     <div class="main-content">
       <div class="game-wrapper">
@@ -506,7 +521,22 @@
     const pathParts = window.location.pathname.split('/');
     const project = pathParts[pathParts.length - 1] || pathParts[pathParts.length - 2];
 
-    document.getElementById('project-path').textContent = '~/projects/' + project + '/ms/';
+    async function loadProjectPath() {
+      try {
+        const res = await fetch('/api/project/' + project + '/path');
+        if (res.ok) {
+          const data = await res.json();
+          let msPath = data.path ? data.path + '/ms' : 'unknown';
+          msPath = msPath.replace(/^\/Users\/[^\/]+/, '~');
+          document.getElementById('project-path').textContent = msPath;
+        } else {
+          document.getElementById('project-path').textContent = 'unknown';
+        }
+      } catch (e) {
+        document.getElementById('project-path').textContent = 'unknown';
+      }
+    }
+    loadProjectPath();
 
     let ws = null;
     let runtime = null;

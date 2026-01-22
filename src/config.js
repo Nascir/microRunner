@@ -4,8 +4,6 @@ const path = require('path');
 const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf-8'));
 const VERSION = pkg.version;
 
-const PROJECTS_TOML = path.join(__dirname, '..', 'projects.toml');
-
 // Synchronous TOML module load at startup for better performance
 let tomlModule = null;
 let tomlModuleLoading = null;
@@ -70,97 +68,6 @@ function generateUniqueFolderName(baseName) {
   } while (true);
 }
 
-function isPathExists(absolutePath) {
-  return fs.existsSync(absolutePath);
-}
-
-async function readProjectsToml() {
-  const { parse } = await getToml();
-  if (!fs.existsSync(PROJECTS_TOML)) {
-    return { projects: { paths: [] } };
-  }
-  return parse(fs.readFileSync(PROJECTS_TOML, 'utf-8'));
-}
-
-async function writeProjectsToml(data) {
-  const { stringify } = await getToml();
-  fs.writeFileSync(PROJECTS_TOML, stringify(data));
-}
-
-async function addProject(slug, absolutePath) {
-  const registry = await readProjectsToml();
-  if (!registry.projects) {
-    registry.projects = { paths: [] };
-  }
-  registry.projects.paths.push({
-    slug: slug,
-    path: absolutePath,
-  });
-  await writeProjectsToml(registry);
-}
-
-async function removeProject(slug) {
-  const registry = await readProjectsToml();
-  if (registry.projects && registry.projects.paths) {
-    registry.projects.paths = registry.projects.paths.filter(p => p.slug !== slug);
-    await writeProjectsToml(registry);
-  }
-}
-
-async function getProjectPath(slug) {
-  const registry = await readProjectsToml();
-  if (registry.projects && registry.projects.paths) {
-    const project = registry.projects.paths.find(p => p.slug === slug);
-    return project ? project.path : null;
-  }
-  return null;
-}
-
-async function getAllProjects() {
-  const registry = await readProjectsToml();
-  if (!registry.projects || !registry.projects.paths) {
-    return [];
-  }
-  return registry.projects.paths;
-}
-
-async function cleanStaleProjects() {
-  const registry = await readProjectsToml();
-  if (!registry.projects || !registry.projects.paths) {
-    return;
-  }
-
-  const validPaths = [];
-  let removedCount = 0;
-
-  for (const project of registry.projects.paths) {
-    if (fs.existsSync(project.path)) {
-      validPaths.push(project);
-    } else {
-      removedCount++;
-    }
-  }
-
-  if (removedCount > 0) {
-    registry.projects.paths = validPaths;
-    await writeProjectsToml(registry);
-  }
-}
-
-async function updateProjectSlug(oldSlug, newSlug, newPath) {
-  const registry = await readProjectsToml();
-  if (registry.projects && registry.projects.paths) {
-    const projectIndex = registry.projects.paths.findIndex(p => p.slug === oldSlug);
-    if (projectIndex !== -1) {
-      registry.projects.paths[projectIndex] = {
-        slug: newSlug,
-        path: newPath,
-      };
-      await writeProjectsToml(registry);
-    }
-  }
-}
-
 function detectSpriteFrames(spritePath, spriteDirection) {
   try {
     const fd = fs.openSync(spritePath, 'r');
@@ -220,7 +127,7 @@ async function syncSprites(projectPath) {
 
   for (const entry of entries) {
     const fullPath = path.join(spritesDir, entry);
-    if (fs.statSync(fullPath).isFile() && entry.match(/\.(png|jpg|jpeg|gif)$/i)) {
+    if (fs.statSync(fullPath).isFile() && entry.match(/\.(png|jpg|jpeg)$/i)) {
       existingSpriteFiles.add(entry);
 
       const currentFrames = config.sprites[entry]?.frames;
@@ -317,7 +224,7 @@ function toProjectJson(config) {
   };
 }
 
-function fromProjectJson(json) {
+function fromProjectJson(json, options = {}) {
   const sprites = { direction: json.spriteDirection || 'vertical' };
   for (const [key, value] of Object.entries(json.files || {})) {
     if (key.startsWith('sprites/')) {
@@ -327,6 +234,7 @@ function fromProjectJson(json) {
   }
 
   return {
+    microrunnerVersion: options.microrunnerVersion || null,
     meta: {
       name: json.title || json.slug,
       slug: json.slug,
@@ -387,13 +295,4 @@ module.exports = {
   generateDefaultProjectPath,
   generateUniqueFolderName,
   getDocumentsPath,
-  isPathExists,
-  readProjectsToml,
-  writeProjectsToml,
-  addProject,
-  removeProject,
-  getProjectPath,
-  getAllProjects,
-  cleanStaleProjects,
-  updateProjectSlug,
 };

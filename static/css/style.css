@@ -1503,3 +1503,33 @@ h1 .accent {
     gap: 12px;
     padding: 16px 20px;
 }
+
+.home-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    text-align: center;
+}
+
+.home-container h1 {
+    font-size: 3rem;
+    margin-bottom: 10px;
+}
+
+.home-container .subtitle {
+    font-size: 1rem;
+    color: var(--color-textSecondary);
+    margin-bottom: 20px;
+}
+
+.home-container .version-badge {
+    margin-bottom: 40px;
+}
+
+.home-container .footer {
+    margin-top: auto;
+    padding-top: 40px;
+    border-top: 1px solid var(--color-border);
+}

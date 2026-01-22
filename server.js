@@ -4,18 +4,57 @@ const WebSocket = require('ws');
 const path = require('path');
 const fs = require('fs');
 const chokidar = require('chokidar');
-const { exec } = require('child_process');
+const { exec, spawn } = require('child_process');
 const backup = require('./src/backup.js');
 const config = require('./src/config.js');
 const trash = require('./src/trash.js');
 const note = require('./src/note.js');
 
-const PORT = process.env.PORT || 3000;
+let cliProjectPath = null;
+let cliPort = null;
+
+for (const arg of process.argv) {
+  if (arg.startsWith('--project-path=')) {
+    cliProjectPath = arg.split('=')[1];
+  } else if (arg.startsWith('--port=')) {
+    cliPort = parseInt(arg.split('=')[1], 10);
+  }
+}
+
+const PORT = cliPort || process.env.PORT || 3000;
 
 function getCachedPackageJson() {
   return JSON.parse(
     fs.readFileSync(path.join(__dirname, 'package.json'), 'utf-8'),
   );
+}
+
+function resolveProjectPath(slug) {
+  if (cliProjectPath) {
+    const tomlPath = path.join(cliProjectPath, 'project.toml');
+    if (fs.existsSync(tomlPath)) {
+      return cliProjectPath;
+    }
+  }
+
+  let current = process.cwd();
+  const root = path.parse(current).root;
+  let depth = 0;
+
+  while (current !== root && depth < 5) {
+    const tomlPath = path.join(current, 'project.toml');
+    if (fs.existsSync(tomlPath)) {
+      return current;
+    }
+    current = path.dirname(current);
+    depth++;
+  }
+
+  return null;
+}
+
+function resolveProjectFromToml(slug) {
+  return resolveProjectPath(slug);
 }
 
 const app = express();
@@ -29,55 +68,6 @@ app.use(express.static(path.join(__dirname, 'static')));
 const projectClients = new Map();
 const projectSpriteWatchers = new Map();
 const projectWsClients = new Map();
-
-function ensureProjectStructure(projectPath, projectName, options = {}) {
-  const templatePath = path.join(__dirname, 'static', 'template');
-
-  fs.mkdirSync(path.join(projectPath, 'ms'), { recursive: true });
-  fs.mkdirSync(path.join(projectPath, 'sprites'), { recursive: true });
-  fs.mkdirSync(path.join(projectPath, 'assets'), { recursive: true });
-
-  const templateIconPath = path.join(templatePath, 'icon.png');
-  if (fs.existsSync(templateIconPath)) {
-    fs.copyFileSync(templateIconPath, path.join(projectPath, 'sprites', 'icon.png'));
-  }
-
-  const templateFontPath = path.join(templatePath, 'BitCell.ttf');
-  if (fs.existsSync(templateFontPath)) {
-    fs.copyFileSync(templateFontPath, path.join(projectPath, 'assets', 'BitCell.ttf'));
-  }
-
-  const mainMsPath = path.join(projectPath, 'ms', 'main.ms');
-  if (!fs.existsSync(mainMsPath)) {
-    const templateMainMsPath = path.join(templatePath, 'main.ms');
-    if (fs.existsSync(templateMainMsPath)) {
-      fs.copyFileSync(templateMainMsPath, mainMsPath);
-    } else {
-      const mainMs = `init = function()
-end
-
-update = function()
-end
-
-draw = function()
-  screen.clear()
-  screen.drawText("Hello, World!", 0, 0, 12, "white")
-end
-`;
-      fs.writeFileSync(mainMsPath, mainMs);
-    }
-  }
-
-  if (options.createConfig !== false) {
-    const projectConfig = config.createConfig(options.name || projectName, path.basename(projectPath), {
-      orientation: options.orientation || 'any',
-      aspect: options.aspect || 'free',
-      spriteDirection: options.spriteDirection || 'vertical',
-      spriteFrames: { 'icon.png': 1 },
-    });
-    config.write(projectPath, projectConfig);
-  }
-}
 
 const mtimeCache = new Map();
 const MTIME_CACHE_TTL = 5000;
@@ -112,17 +102,7 @@ function getLatestMtime(dir) {
   return latest;
 }
 
-async function getProjectLastUpdated(slug) {
-  const projectPath = await config.getProjectPath(slug);
-  if (!projectPath) return null;
-  const mtimeMs = getLatestMtime(projectPath);
-  return mtimeMs > 0 ? new Date(mtimeMs) : null;
-}
-
-async function validatePath(slug, subdir, userPath) {
-  const projectPath = await config.getProjectPath(slug);
-  if (!projectPath) return null;
-
+async function validatePath(projectPath, subdir, userPath) {
   const basePath = path.resolve(projectPath, subdir);
   const resolved = path.resolve(basePath, userPath);
   const relative = path.relative(basePath, resolved);
@@ -132,40 +112,7 @@ async function validatePath(slug, subdir, userPath) {
   return resolved;
 }
 
-async function getProjects() {
-  await config.cleanStaleProjects();
-  const projects = await config.getAllProjects();
-
-  const results = await Promise.all(
-    projects.map(async (proj) => {
-      const projectPath = proj.path;
-      try {
-        const projectConfig = await config.read(projectPath);
-        const mtime = getLatestMtime(projectPath);
-        const hasNote = note.noteExists(projectPath);
-        return {
-          name: projectConfig.meta.name,
-          slug: projectConfig.meta.slug,
-          orientation: projectConfig.settings.orientation,
-          aspect: projectConfig.settings.aspect,
-          projectPath: proj.path,
-          lastUpdated: mtime > 0 ? new Date(mtime) : null,
-          hasNote,
-        };
-      } catch (e) {
-        console.warn(`Failed to read project.toml for ${proj.slug}:`, e.message);
-        return null;
-      }
-    })
-  );
-
-  return results.filter(Boolean);
-}
-
-async function getProjectFiles(slug) {
-  const projectPath = await config.getProjectPath(slug);
-  if (!projectPath) return null;
-
+async function getProjectFiles(projectPath) {
   const msDir = path.join(projectPath, 'ms');
   const sources = [];
   if (fs.existsSync(msDir)) {
@@ -198,13 +145,13 @@ async function getProjectFiles(slug) {
     }
 
     for (const file of spriteFiles) {
-      if (file.match(/\.(png|jpg|jpeg|gif)$/i)) {
+      if (file.match(/\.(png|jpg|jpeg)$/i)) {
         const imageObj = {
           file: file,
           version: Date.now(),
         };
 
-        const baseName = path.basename(file).replace(/\.(png|jpg|jpeg|gif)$/i, '');
+        const baseName = path.basename(file).replace(/\.(png|jpg|jpeg)$/i, '');
         if (spriteProperties[baseName]) {
           imageObj.properties = spriteProperties[baseName];
         } else if (spriteProperties[file]) {
@@ -248,8 +195,8 @@ async function getProjectFiles(slug) {
   if (fs.existsSync(soundsDir)) {
     const soundFiles = fs.readdirSync(soundsDir);
     for (const file of soundFiles) {
-      if (file.match(/\.(wav|mp3|ogg)$/i)) {
-        const name = file.replace(/\.(wav|mp3|ogg)$/i, '').replace(/\//g, '-');
+      if (file.match(/\.(wav|ogg|flac)$/i)) {
+        const name = file.replace(/\.(wav|ogg|flac)$/i, '').replace(/\//g, '-');
         const ext = file.split('.').pop();
         sounds.push({
           file: name + '.' + ext,
@@ -264,8 +211,8 @@ async function getProjectFiles(slug) {
   if (fs.existsSync(musicDir)) {
     const musicFiles = fs.readdirSync(musicDir);
     for (const file of musicFiles) {
-      if (file.match(/\.(wav|mp3|ogg)$/i)) {
-        const name = file.replace(/\.(wav|mp3|ogg)$/i, '').replace(/\//g, '-');
+      if (file.match(/\.(mp3|ogg|flac)$/i)) {
+        const name = file.replace(/\.(mp3|ogg|flac)$/i, '').replace(/\//g, '-');
         const ext = file.split('.').pop();
         music.push({
           file: name + '.' + ext,
@@ -295,11 +242,10 @@ async function getProjectFiles(slug) {
   return { sources, images, maps, sounds, music, assets };
 }
 
-async function watchProject(slug) {
-  if (projectClients.has(slug)) return;
+let activeWatcher = null;
 
-  const projectPath = await config.getProjectPath(slug);
-  if (!projectPath) return;
+async function watchProject(projectPath, slug) {
+  if (activeWatcher) return;
 
   const msDir = path.join(projectPath, 'ms');
   if (!fs.existsSync(msDir)) return;
@@ -323,24 +269,20 @@ async function watchProject(slug) {
       });
 
       await config.touch(projectPath);
-      broadcastToAllProjects();
     } catch (err) {
       console.error(`[Server] Error reading ${filePath}:`, err);
     }
   });
 
-  projectClients.set(slug, watcher);
-  watchSprites(slug);
+  activeWatcher = watcher;
+  watchSprites(projectPath, slug);
 }
 
-async function handleSpriteChange(slug, event, filePath) {
-  const projectPath = await config.getProjectPath(slug);
-  if (!projectPath) return;
-
+async function handleSpriteChange(projectPath, slug, event, filePath) {
   try {
     await config.syncSprites(projectPath);
     const spriteProps = config.getSpriteProperties(filePath, projectPath);
-    const fileName = path.basename(filePath).replace(/\.(png|jpg|jpeg|gif)$/i, '');
+    const fileName = path.basename(filePath).replace(/\.(png|jpg|jpeg)$/i, '');
 
     broadcastToProject(slug, {
       type: 'sprites',
@@ -353,11 +295,8 @@ async function handleSpriteChange(slug, event, filePath) {
   }
 }
 
-async function watchSprites(slug) {
+async function watchSprites(projectPath, slug) {
   if (projectSpriteWatchers.has(slug)) return;
-
-  const projectPath = await config.getProjectPath(slug);
-  if (!projectPath) return;
 
   const spritesDir = path.join(projectPath, 'sprites');
   if (!fs.existsSync(spritesDir)) return;
@@ -368,18 +307,11 @@ async function watchSprites(slug) {
     ignoreInitial: true,
   });
 
-  watcher.on('add', (filePath) => handleSpriteChange(slug, 'add', filePath));
-  watcher.on('unlink', (filePath) => handleSpriteChange(slug, 'unlink', filePath));
-  watcher.on('change', (filePath) => handleSpriteChange(slug, 'change', filePath));
+  watcher.on('add', (filePath) => handleSpriteChange(projectPath, slug, 'add', filePath));
+  watcher.on('unlink', (filePath) => handleSpriteChange(projectPath, slug, 'unlink', filePath));
+  watcher.on('change', (filePath) => handleSpriteChange(projectPath, slug, 'change', filePath));
 
   projectSpriteWatchers.set(slug, watcher);
-}
-
-async function watchAllProjects() {
-  const projects = await config.getAllProjects();
-  for (const proj of projects) {
-    await watchProject(proj.slug);
-  }
 }
 
 function broadcastToProject(project, message) {
@@ -388,15 +320,6 @@ function broadcastToProject(project, message) {
   for (const client of clients) {
     if (client.readyState === WebSocket.OPEN) {
       client.send(msg);
-    }
-  }
-}
-
-function broadcastToAllProjects() {
-  const message = JSON.stringify({ type: 'projectListUpdated' });
-  for (const client of wss.clients) {
-    if (client.readyState === WebSocket.OPEN) {
-      client.send(message);
     }
   }
 }
@@ -413,7 +336,10 @@ wss.on('connection', (ws, req) => {
   ws.project = project;
 
   if (project) {
-    watchProject(project);
+    const projectPath = resolveProjectFromToml(project);
+    if (projectPath) {
+      watchProject(projectPath, project);
+    }
     if (!projectWsClients.has(project)) {
       projectWsClients.set(project, new Set());
     }
@@ -446,14 +372,9 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'static', 'index.html'));
 });
 
-app.get('/api/projects', async (req, res) => {
-  const projects = await getProjects();
-  res.json(projects);
-});
-
 app.get('/api/project/:name', async (req, res) => {
   const slug = req.params.name;
-  const projectPath = await config.getProjectPath(slug);
+  const projectPath = resolveProjectFromToml(slug);
 
   if (!projectPath) {
     return res.status(404).json({ error: 'Project not found' });
@@ -466,7 +387,7 @@ app.get('/api/project/:name', async (req, res) => {
     return res.status(404).json({ error: 'Project not found' });
   }
 
-  const files = await getProjectFiles(slug);
+  const files = await getProjectFiles(projectPath);
   const configData = {
     name: projectConfig.meta.name,
     slug: projectConfig.meta.slug,
@@ -478,10 +399,27 @@ app.get('/api/project/:name', async (req, res) => {
   res.json({ ...configData, files });
 });
 
+app.get('/api/project/:slug/path', (req, res) => {
+  if (cliProjectPath) {
+    res.json({ path: cliProjectPath });
+  } else {
+    const projectPath = resolveProjectFromToml(req.params.slug);
+    if (projectPath) {
+      res.json({ path: projectPath });
+    } else {
+      res.status(404).json({ error: 'Project not found' });
+    }
+  }
+});
+
 app.get('/api/file/:project/*', async (req, res) => {
   const { project } = req.params;
   const file = req.params[0];
-  const filePath = await validatePath(project, 'ms', file);
+  const projectPath = resolveProjectFromToml(project);
+  if (!projectPath) {
+    return res.status(403).send('Access denied');
+  }
+  const filePath = await validatePath(projectPath, 'ms', file);
   if (!filePath) {
     return res.status(403).send('Access denied');
   }
@@ -493,312 +431,14 @@ app.get('/api/file/:project/*', async (req, res) => {
   }
 });
 
-app.put('/api/project/:name/config', async (req, res) => {
-  const oldSlug = req.params.name;
-  const newConfig = req.body;
-
-  const oldProjectPath = await config.getProjectPath(oldSlug);
-  if (!oldProjectPath) {
-    return res.status(404).json({ error: 'Project not found' });
-  }
-
-  const newSlug = newConfig.slug || oldSlug;
-  let newProjectPath = oldProjectPath;
-
-  if (oldSlug !== newSlug) {
-    newProjectPath = await config.generateDefaultProjectPath(newSlug);
-    if (fs.existsSync(newProjectPath)) {
-      return res
-        .status(400)
-        .json({ error: 'A project with this slug already exists' });
-    }
-  }
-
-  try {
-    const projectConfig = await config.read(oldProjectPath);
-    projectConfig.meta.name = newConfig.name;
-    projectConfig.meta.slug = newSlug;
-    projectConfig.settings.orientation = newConfig.orientation;
-    projectConfig.settings.aspect = newConfig.aspect;
-    projectConfig.settings.graphics = newConfig.graphics;
-    projectConfig.sprites.direction = newConfig.spriteDirection;
-    projectConfig.meta.lastModified = new Date().toISOString().slice(0, 19) + 'Z';
-
-    if (oldSlug !== newSlug) {
-      fs.renameSync(oldProjectPath, newProjectPath);
-      await config.removeProject(oldSlug);
-      await config.addProject(newSlug, newProjectPath);
-    }
-
-    await config.write(newProjectPath, projectConfig);
-
-    res.json({ success: true, slug: newSlug });
-  } catch (e) {
-    console.error('Failed to update project config:', e);
-    res.status(500).json({ error: 'Failed to update configuration' });
-  }
-});
-
-app.post('/api/projects', async (req, res) => {
-  const { name, slug, orientation, aspect, spriteDirection, path: customPath } = req.body;
-
-  if (!name || !name.trim()) {
-    return res.status(400).json({ error: 'Project name is required' });
-  }
-
-  if (!slug || !slug.trim()) {
-    return res.status(400).json({ error: 'Project slug is required' });
-  }
-
-  const slugRegex = /^[a-z0-9-]+$/;
-  if (!slugRegex.test(slug)) {
-    return res.status(400).json({ error: 'Slug can only contain lowercase letters, numbers, and hyphens' });
-  }
-
-  const registry = await config.readProjectsToml();
-  const existingProject = registry.projects?.paths?.find(p => p.slug === slug);
-  if (existingProject) {
-    return res.status(400).json({ error: 'A project with this slug already exists', existingPath: existingProject.path });
-  }
-
-  if (!customPath || !customPath.trim()) {
-    return res.status(400).json({ error: 'Project path is required' });
-  }
-
-  const isAbsolute = path.isAbsolute(customPath);
-  if (!isAbsolute) {
-    return res.status(400).json({ error: 'Path must be an absolute path' });
-  }
-
-  const parentDir = path.dirname(customPath);
-  if (!fs.existsSync(parentDir)) {
-    return res.status(400).json({ error: 'Parent directory does not exist', parentPath: parentDir });
-  }
-
-  const folderExists = fs.existsSync(customPath);
-
-  let projectPath = customPath;
-
-  try {
-    ensureProjectStructure(projectPath, slug, {
-      name: name,
-      orientation: orientation || 'any',
-      aspect: aspect || 'free',
-      spriteDirection: spriteDirection || 'vertical',
-    });
-
-    await config.addProject(slug, projectPath);
-
-    res.json({ success: true, slug: slug, path: projectPath });
-  } catch (e) {
-    console.error('Failed to create project:', e);
-    res.status(500).json({ error: 'Failed to create project' });
-  }
-});
-
-app.post('/api/project/open', async (req, res) => {
-  const { path: projectPath } = req.body;
-
-  console.log('[Open Project] Received path:', projectPath);
-
-  if (!projectPath) {
-    console.log('[Open Project] No path provided');
-    return res.status(400).json({ success: false, error: 'No path provided' });
-  }
-
-  if (!fs.existsSync(projectPath)) {
-    console.log('[Open Project] Folder does not exist:', projectPath);
-    return res.json({ success: false, error: 'Folder does not exist' });
-  }
-
-  const tomlPath = path.join(projectPath, 'project.toml');
-  console.log('[Open Project] Checking for TOML at:', tomlPath);
-  if (!fs.existsSync(tomlPath)) {
-    return res.json({
-      success: false,
-      error: 'Missing project.toml - not a microRunner project',
-    });
-  }
-
-  const msPath = path.join(projectPath, 'ms');
-  console.log('[Open Project] Checking for ms/ at:', msPath);
-  if (!fs.existsSync(msPath)) {
-    return res.json({
-      success: false,
-      error: 'Missing ms/ directory - not a valid microRunner project',
-    });
-  }
-
-  let projectConfig;
-  try {
-    projectConfig = await config.read(projectPath);
-    console.log('[Open Project] Config loaded, slug:', projectConfig.meta?.slug);
-  } catch (e) {
-    console.log('[Open Project] Invalid TOML:', e.message);
-    return res.json({
-      success: false,
-      error: 'Invalid project.toml format',
-    });
-  }
-
-  const originalSlug = projectConfig.meta?.slug;
-  if (!originalSlug) {
-    return res.json({
-      success: false,
-      error: 'Missing slug in project.toml',
-    });
-  }
-
-  async function generateUniqueSlug(baseSlug) {
-    let counter = 1;
-    let newSlug = baseSlug;
-    while (await config.getProjectPath(newSlug)) {
-      newSlug = `${baseSlug}-${counter}`;
-      counter++;
-    }
-    return newSlug;
-  }
-
-  const existingPath = await config.getProjectPath(originalSlug);
-  console.log('[Open Project] Existing path for slug:', existingPath);
-
-  if (existingPath === projectPath) {
-    console.log('[Open Project] Same project already registered');
-    return res.json({ success: true, alreadyExists: true, slug: originalSlug });
-  }
-
-  if (existingPath) {
-    console.log('[Open Project] Slug conflict, generating unique slug');
-    const newSlug = await generateUniqueSlug(originalSlug);
-    console.log('[Open Project] New slug:', newSlug);
-
-    projectConfig.meta.slug = newSlug;
-    try {
-      await config.write(projectPath, projectConfig);
-      console.log('[Open Project] Updated project.toml with new slug');
-    } catch (e) {
-      console.log('[Open Project] Failed to update project.toml:', e.message);
-      return res.json({
-        success: false,
-        error: 'Failed to update project.toml: ' + e.message,
-      });
-    }
-
-    await config.addProject(newSlug, projectPath);
-    console.log('[Open Project] Added project with new slug:', newSlug);
-
-    return res.json({
-      success: true,
-      slugChanged: true,
-      oldSlug: originalSlug,
-      newSlug: newSlug,
-    });
-  }
-
-  await config.addProject(originalSlug, projectPath);
-  console.log('[Open Project] Successfully added project:', originalSlug);
-
-  res.json({ success: true, slug: originalSlug });
-});
-
-app.delete('/api/project/:name', async (req, res) => {
-  const slug = req.params.name;
-  const projectPath = await config.getProjectPath(slug);
-
-  if (!projectPath) {
-    return res.status(404).json({ error: 'Project not found' });
-  }
-
-  try {
-    await trash.moveToTrash(projectPath, slug);
-    await config.removeProject(slug);
-    res.json({ success: true });
-  } catch (e) {
-    console.error('Failed to delete project:', e);
-    res.status(500).json({ error: 'Failed to delete project' });
-  }
-});
-
-app.post('/api/project/config', async (req, res) => {
-  const { slug, newName, newSlug, orientation, aspect, spriteDirection } = req.body;
-
-  if (!slug || !newName || !newSlug) {
-    return res.status(400).json({ error: 'Missing required fields' });
-  }
-
-  if (slug !== newSlug) {
-    const registry = await config.readProjectsToml();
-    const existing = registry.projects?.paths?.find(p => p.slug === newSlug);
-    if (existing) {
-      return res.status(400).json({ error: 'A project with this slug already exists' });
-    }
-  }
-
-  const projectPath = await config.getProjectPath(slug);
-  if (!projectPath) {
-    return res.status(404).json({ error: 'Project not found' });
-  }
-
-  const projectTomlPath = path.join(projectPath, 'project.toml');
-
-  try {
-    const projectConfig = await config.read(projectTomlPath);
-
-    projectConfig.name = newName;
-    projectConfig.orientation = orientation;
-    projectConfig.aspect = aspect;
-    projectConfig.spriteDirection = spriteDirection;
-
-    if (slug !== newSlug) {
-      projectConfig.slug = newSlug;
-      await config.updateProjectSlug(slug, newSlug);
-    }
-
-    await config.write(projectTomlPath, projectConfig);
-
-    res.json({ success: true });
-  } catch (e) {
-    console.error('Failed to save config:', e);
-    res.status(500).json({ error: 'Failed to save configuration' });
-  }
-});
-
-app.post('/api/project/:name/duplicate', async (req, res) => {
-  const slug = req.params.name;
-  const { name, path, orientation, aspect, spriteDirection } = req.body;
-
-  try {
-    const options = {};
-    if (name) options.name = name;
-    if (path) options.path = path;
-    if (orientation) options.orientation = orientation;
-    if (aspect) options.aspect = aspect;
-    if (spriteDirection) options.spriteDirection = spriteDirection;
-
-    const result = await backup.duplicateProject(slug, options);
-    res.json(result);
-  } catch (e) {
-    console.error('Failed to duplicate project:', e);
-    res.status(500).json({ error: 'Failed to duplicate project' });
-  }
-});
-
-app.get('/api/project/:name/duplicate/preview', async (req, res) => {
-  const slug = req.params.name;
-
-  try {
-    const result = await backup.getDuplicatePreview(slug);
-    res.json(result);
-  } catch (e) {
-    console.error('Failed to get duplicate preview:', e);
-    res.status(500).json({ error: 'Failed to get duplicate preview' });
-  }
-});
-
 app.get('/api/sprite/:project/*', async (req, res) => {
   const { project } = req.params;
   const spritePath = req.params[0];
-  const filePath = await validatePath(project, 'sprites', spritePath);
+  const projectPath = resolveProjectFromToml(project);
+  if (!projectPath) {
+    return res.status(403).send('Access denied');
+  }
+  const filePath = await validatePath(projectPath, 'sprites', spritePath);
   if (!filePath) {
     return res.status(403).send('Access denied');
   }
@@ -812,7 +452,11 @@ app.get('/api/sprite/:project/*', async (req, res) => {
 app.get('/api/map/:project/*', async (req, res) => {
   const { project } = req.params;
   const mapPath = req.params[0];
-  const filePath = await validatePath(project, 'maps', mapPath);
+  const projectPath = resolveProjectFromToml(project);
+  if (!projectPath) {
+    return res.status(403).send('Access denied');
+  }
+  const filePath = await validatePath(projectPath, 'maps', mapPath);
   if (!filePath) {
     return res.status(403).send('Access denied');
   }
@@ -827,7 +471,11 @@ app.get('/api/map/:project/*', async (req, res) => {
 app.get('/api/sound/:project/*', async (req, res) => {
   const { project } = req.params;
   const soundPath = req.params[0];
-  let filePath = await validatePath(project, 'sounds', soundPath);
+  const projectPath = resolveProjectFromToml(project);
+  if (!projectPath) {
+    return res.status(403).send('Access denied');
+  }
+  let filePath = await validatePath(projectPath, 'sounds', soundPath);
   if (!filePath) {
     return res.status(403).send('Access denied');
   }
@@ -835,11 +483,11 @@ app.get('/api/sound/:project/*', async (req, res) => {
     res.sendFile(filePath);
   } else {
     const ext = soundPath.split('.').pop();
-    if (ext !== 'wav' && ext !== 'mp3' && ext !== 'ogg') {
-      const basePath = soundPath.replace(/\.(wav|mp3|ogg)$/i, '');
-      for (const tryExt of ['wav', 'mp3', 'ogg']) {
+    if (ext !== 'wav' && ext !== 'ogg' && ext !== 'flac') {
+      const basePath = soundPath.replace(/\.(wav|ogg|flac)$/i, '');
+      for (const tryExt of ['wav', 'ogg', 'flac']) {
         const tryPath = await validatePath(
-          project,
+          projectPath,
           'sounds',
           basePath + '.' + tryExt,
         );
@@ -855,7 +503,11 @@ app.get('/api/sound/:project/*', async (req, res) => {
 app.get('/api/music/:project/*', async (req, res) => {
   const { project } = req.params;
   const musicPath = req.params[0];
-  let filePath = await validatePath(project, 'music', musicPath);
+  const projectPath = resolveProjectFromToml(project);
+  if (!projectPath) {
+    return res.status(403).send('Access denied');
+  }
+  let filePath = await validatePath(projectPath, 'music', musicPath);
   if (!filePath) {
     return res.status(403).send('Access denied');
   }
@@ -863,10 +515,10 @@ app.get('/api/music/:project/*', async (req, res) => {
     res.sendFile(filePath);
   } else {
     const ext = musicPath.split('.').pop();
-    if (ext !== 'wav' && ext !== 'mp3' && ext !== 'ogg') {
-      const basePath = musicPath.replace(/\.(wav|mp3|ogg)$/i, '');
-      for (const tryExt of ['wav', 'mp3', 'ogg']) {
-        const tryPath = await validatePath(project, 'music', basePath + '.' + tryExt);
+    if (ext !== 'mp3' && ext !== 'ogg' && ext !== 'flac') {
+      const basePath = musicPath.replace(/\.(mp3|ogg|flac)$/i, '');
+      for (const tryExt of ['mp3', 'ogg', 'flac']) {
+        const tryPath = await validatePath(projectPath, 'music', basePath + '.' + tryExt);
         if (tryPath && fs.existsSync(tryPath)) {
           return res.sendFile(tryPath);
         }
@@ -879,7 +531,11 @@ app.get('/api/music/:project/*', async (req, res) => {
 app.get('/api/assets/:project/*', async (req, res) => {
   const { project } = req.params;
   const assetPath = req.params[0];
-  const filePath = await validatePath(project, 'assets', assetPath);
+  const projectPath = resolveProjectFromToml(project);
+  if (!projectPath) {
+    return res.status(403).send('Access denied');
+  }
+  const filePath = await validatePath(projectPath, 'assets', assetPath);
   if (!filePath) {
     return res.status(403).send('Access denied');
   }
@@ -1131,7 +787,7 @@ app.delete('/api/project/:name/backups/:file/note', async (req, res) => {
 app.get('/api/project/:name/note', async (req, res) => {
   const { name } = req.params;
   try {
-    const projectPath = await config.getProjectPath(name);
+    const projectPath = resolveProjectFromToml(name);
     if (!projectPath) {
       return res.status(404).json({ error: 'Project not found' });
     }
@@ -1147,7 +803,7 @@ app.put('/api/project/:name/note', async (req, res) => {
   const { name } = req.params;
   const { note: noteContent } = req.body;
   try {
-    const projectPath = await config.getProjectPath(name);
+    const projectPath = resolveProjectFromToml(name);
     if (!projectPath) {
       return res.status(404).json({ error: 'Project not found' });
     }
@@ -1162,7 +818,7 @@ app.put('/api/project/:name/note', async (req, res) => {
 app.delete('/api/project/:name/note', async (req, res) => {
   const { name } = req.params;
   try {
-    const projectPath = await config.getProjectPath(name);
+    const projectPath = resolveProjectFromToml(name);
     if (!projectPath) {
       return res.status(404).json({ error: 'Project not found' });
     }
@@ -1180,64 +836,6 @@ app.get('/:project', (req, res) => {
     return res.status(404).send('Not found');
   }
   res.sendFile(path.join(__dirname, 'static', 'game.html'));
-});
-
-app.get('/api/default-path', async (req, res) => {
-  const { name } = req.query;
-  const baseName = name || 'Project';
-  const slug = baseName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-  const defaultPath = await config.generateDefaultProjectPath(slug);
-  res.json({ path: defaultPath });
-});
-
-app.get('/api/unique-folder-name', async (req, res) => {
-  const { slug } = req.query;
-  if (!slug) {
-    return res.json({ folderName: 'Project' });
-  }
-  const folderName = config.generateUniqueFolderName(slug);
-  res.json({ folderName });
-});
-
-app.get('/api/slug-exists', async (req, res) => {
-  const { slug } = req.query;
-  if (!slug) {
-    return res.json({ exists: false });
-  }
-  const registry = await config.readProjectsToml();
-  const exists = registry.projects?.paths?.some(p => p.slug === slug);
-  res.json({ exists, slug });
-});
-
-app.get('/api/documents-path', async (req, res) => {
-  const documentsPath = config.getDocumentsPath();
-  res.json({ path: documentsPath });
-});
-
-app.get('/api/system/pick-folder', (req, res) => {
-  const platform = process.platform;
-  let command = '';
-
-  if (platform === 'darwin') {
-    command = 'osascript -e \'POSIX path of (choose folder with prompt "Choose project folder")\'';
-  } else if (platform === 'win32') {
-    command = 'powershell -Command "Add-Type -AssemblyName System.Windows.Forms; $f = New-Object System.Windows.Forms.FolderBrowserDialog; $f.Description = \'Choose project folder\'; $f.ShowNewFolderButton = $true; if($f.ShowDialog() -eq \'OK\') { $f.SelectedPath }"';
-  } else if (platform === 'linux') {
-    command = 'if command -v zenity >/dev/null; then zenity --file-selection --directory --title="Choose project folder"; elif command -v kdialog >/dev/null; then kdialog --getexistingdirectory . --title="Choose project folder"; else echo "NO_TOOL"; fi';
-  } else {
-    command = 'echo "NO_TOOL"';
-  }
-
-  exec(command, (error, stdout, stderr) => {
-    const output = stdout.trim();
-
-    if (error || output === 'NO_TOOL' || !output) {
-      return res.json({ path: null, cancelled: true, error: output === 'NO_TOOL' ? 'Missing zenity or kdialog' : null });
-    }
-
-    const normalizedPath = path.normalize(output);
-    res.json({ path: normalizedPath, cancelled: false });
-  });
 });
 
 const GITHUB_REPO = 'Nascir/microrunner';
@@ -1593,7 +1191,7 @@ app.get('/api/update/download', async (req, res) => {
 
 (async () => {
   try {
-    const count = trash.emptyExpiredTrash();
+    const count = await trash.emptyExpiredTrash();
     if (count > 0) {
       console.log(`[Trash] Permanently deleted ${count} expired project(s)`);
     }
@@ -1602,22 +1200,50 @@ app.get('/api/update/download', async (req, res) => {
   }
 })();
 
-watchAllProjects();
-
-server.listen(PORT, () => {
+server.listen(PORT, '127.0.0.1', () => {
   console.log(`🟢 microRunner running at http://localhost:${PORT}`);
+  console.log('Press Ctrl+C to stop the server.');
 });
 
+let shuttingDown = false;
+
 function gracefulShutdown(signal) {
-  console.log(`\n${signal} received. Shutting down gracefully...`);
+  if (shuttingDown) return;
+  shuttingDown = true;
+  
+  const shutdownMarker = path.join(__dirname, '.shutdown-' + Date.now());
+  
+  try {
+    fs.writeFileSync(shutdownMarker, 'shutdown');
+  } catch (e) {}
+
+  console.log('\nStopping server...');
+  process.stdout.write('\x1B[0m');
+
+  wss.clients.forEach(client => client.close());
+
+  if (activeWatcher) {
+    activeWatcher.close();
+    activeWatcher = null;
+  }
+  projectSpriteWatchers.forEach(watcher => watcher.close());
+  projectSpriteWatchers.clear();
+
   server.close(() => {
-    console.log('Server closed.');
+    console.log('🔴 Server stopped.');
+    try {
+      if (fs.existsSync(shutdownMarker)) fs.unlinkSync(shutdownMarker);
+    } catch (e) {}
     process.exit(0);
   });
+
   setTimeout(() => {
     console.log('Forcing shutdown...');
+    try {
+      if (fs.existsSync(shutdownMarker)) fs.unlinkSync(shutdownMarker);
+    } catch (e) {}
     process.exit(1);
-  }, 5000);
+  }, 2000);
 }
 
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));

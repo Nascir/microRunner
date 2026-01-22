@@ -3,6 +3,9 @@ const path = require('path');
 const AdmZip = require('adm-zip');
 const config = require('./config');
 
+const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf-8'));
+const VERSION = pkg.version;
+
 const DIRS = ['ms', 'sprites', 'maps', 'sounds', 'music', 'assets', 'doc'];
 const THUMBNAIL_DIRS = ['sounds_th', 'music_th', 'assets_th'];
 
@@ -20,10 +23,27 @@ function getProjectArchiveDir(projectPath) {
   return path.join(projectPath, 'archive');
 }
 
-async function getProjectPath(project) {
-  const projectPath = await config.getProjectPath(project);
+async function findProjectPath(startPath) {
+  let current = path.resolve(startPath);
+  const root = path.parse(current).root;
+  let depth = 0;
+
+  while (current !== root && depth < 5) {
+    const tomlPath = path.join(current, 'project.toml');
+    if (fs.existsSync(tomlPath)) {
+      return current;
+    }
+    current = path.dirname(current);
+    depth++;
+  }
+
+  return null;
+}
+
+async function getProjectPath(slug) {
+  const projectPath = await findProjectPath(slug);
   if (!projectPath) {
-    throw new Error('Project not found in registry');
+    throw new Error('Project not found');
   }
   return projectPath;
 }
@@ -58,7 +78,7 @@ function collectProjectFiles(projectPath) {
     const entries = fs.readdirSync(spritesDir, { recursive: true });
     for (const entry of entries) {
       const fullPath = path.join(spritesDir, entry);
-      if (fs.statSync(fullPath).isFile() && entry.match(/\.(png|jpg|jpeg|gif)$/i)) {
+      if (fs.statSync(fullPath).isFile() && entry.match(/\.(png|jpg|jpeg)$/i)) {
         files.images.push({
           archivePath: `sprites/${entry}`,
           fullPath: fullPath,
@@ -86,7 +106,7 @@ function collectProjectFiles(projectPath) {
     const entries = fs.readdirSync(soundsDir, { recursive: true });
     for (const entry of entries) {
       const fullPath = path.join(soundsDir, entry);
-      if (fs.statSync(fullPath).isFile() && entry.match(/\.(wav|mp3|ogg|flac)$/i)) {
+      if (fs.statSync(fullPath).isFile() && entry.match(/\.(wav|ogg|flac)$/i)) {
         files.sounds.push({
           archivePath: `sounds/${entry}`,
           fullPath: fullPath,
@@ -100,7 +120,7 @@ function collectProjectFiles(projectPath) {
     const entries = fs.readdirSync(musicDir, { recursive: true });
     for (const entry of entries) {
       const fullPath = path.join(musicDir, entry);
-      if (fs.statSync(fullPath).isFile() && entry.match(/\.(wav|mp3|ogg|flac)$/i)) {
+      if (fs.statSync(fullPath).isFile() && entry.match(/\.(mp3|ogg|flac)$/i)) {
         files.music.push({
           archivePath: `music/${entry}`,
           fullPath: fullPath,
@@ -485,7 +505,7 @@ async function restoreProjectFromUpload(project, zipPath, options = {}) {
 
     const tempProjectJsonPath = path.join(tempDir, 'project.json');
     const projectJson = JSON.parse(fs.readFileSync(tempProjectJsonPath, 'utf-8'));
-    const tomlConfig = config.fromProjectJson(projectJson);
+    const tomlConfig = config.fromProjectJson(projectJson, { microrunnerVersion: VERSION });
 
     if (fs.existsSync(projectPath)) {
       fs.rmSync(projectPath, { recursive: true, force: true });
@@ -571,12 +591,12 @@ async function restoreProject(project, backupFile, options = {}) {
       if (fs.existsSync(tempDir)) {
         fs.rmSync(tempDir, { recursive: true, force: true });
       }
-      throw new Error('Invalid or corrupt backup: ' + e.message);
+      throw new Error('Invalid or backup: ' + e.message);
     }
 
     const tempProjectJsonPath = path.join(tempDir, 'project.json');
     const projectJson = JSON.parse(fs.readFileSync(tempProjectJsonPath, 'utf-8'));
-    const tomlConfig = config.fromProjectJson(projectJson);
+    const tomlConfig = config.fromProjectJson(projectJson, { microrunnerVersion: VERSION });
 
     if (fs.existsSync(projectPath)) {
       fs.rmSync(projectPath, { recursive: true, force: true });
@@ -664,7 +684,13 @@ async function importProjectFromArchive(zipPath, options = {}) {
       projectPath = options.customPath;
     } else {
       const baseSlug = projectJson.slug || projectJson.title.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-      projectPath = await config.generateDefaultProjectPath(baseSlug);
+      const cwd = options.cwd || process.cwd();
+      projectPath = path.join(cwd, baseSlug);
+      let counter = 1;
+      while (fs.existsSync(projectPath)) {
+        projectPath = path.join(cwd, `${baseSlug}-${counter}`);
+        counter++;
+      }
     }
 
     fs.mkdirSync(projectPath, { recursive: true });
@@ -700,7 +726,7 @@ async function importProjectFromArchive(zipPath, options = {}) {
       fs.writeFileSync(fullPath, entry.getData());
     }
 
-    const tomlConfig = config.fromProjectJson(projectJson);
+    const tomlConfig = config.fromProjectJson(projectJson, { microrunnerVersion: VERSION });
 
     if (options.name) tomlConfig.meta.name = options.name;
     if (options.slug) tomlConfig.meta.slug = options.slug;
@@ -711,7 +737,6 @@ async function importProjectFromArchive(zipPath, options = {}) {
     await config.write(projectPath, tomlConfig);
 
     await config.touch(projectPath);
-    await config.addProject(tomlConfig.meta.slug, projectPath);
 
     return {
       success: true,

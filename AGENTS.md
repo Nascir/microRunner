@@ -4,62 +4,91 @@ Guidelines for AI agents working on this codebase.
 
 ## Project Overview
 
-microRunner is a local development environment for microStudio games.
+microRunner is a **CLI-based** local development environment for microStudio games.
 
+- **CLI**: Node.js executable (`cli.js`) with commands: `init`, `import`, `start`, `version`, `help`
 - **Server**: Node.js/Express + WebSocket for hot reload
 - **Frontend**: Vanilla JavaScript + microStudio Runtime
 - **Compiler**: microScript v2 (copied from upstream microStudio)
-- **Projects**: Stored outside microRunner folder (user-specified location)
+- **Projects**: Self-contained (each has its own `project.toml`), no global registry
 
 ## Build Commands
 
 ```bash
 npm start        # Production server (port 3000)
 npm run dev      # Development server with auto-restart
+npm run lint     # Run ESLint on all JS files
 npm install      # Install dependencies
-```
 
-Type "rs" and Enter to restart server during development.
+# CLI commands (from any directory with project.toml)
+microrunner init           # Initialize new project in empty folder
+microrunner import <file>  # Import project from microStudio ZIP
+microrunner start          # Scan sprites and start the server (auto-opens game runner)
+microrunner version        # Show version
+microrunner help           # Show help
+```
 
 ## File Organization
 
 ```
 microrunner/
-├── server.js              # Main entry point, all API endpoints
-├── package.json           # npm configuration
-├── projects.toml          # Project registry
+├── cli.js                # CLI entry point (init, import, start, version, help)
+├── server.js             # Main server entry point
+├── package.json          # npm configuration
+├── restart.js            # Auto-restart script
+├── logs/                 # Log files (auto-created)
+│   └── restart.log       # Auto-restart logs
 ├── static/
-│   ├── index.html         # Project browser UI
-│   ├── game.html          # Game runner with terminal
-│   ├── fonts/             # GUI fonts (Inter, Hack) + BitCell
-│   ├── template/          # Template files for new projects
+│   ├── index.html        # Homepage (minimal, badges only)
+│   ├── game.html         # Game runner with terminal
+│   ├── fonts/            # GUI fonts (Inter, Hack) + BitCell
+│   ├── template/         # Template files for new projects
+│   ├── lib/              # External libraries
+│   │   └── font-awesome/ # Font Awesome icons for UI
 │   ├── css/
-│   │   ├── fonts.css      # @font-face (Inter, Hack)
-│   │   ├── style.css      # Main UI styles
-│   │   ├── terminal.css   # Terminal component styles
-│   │   └── theme.css      # Theme variables (--color-*)
+│   │   ├── fonts.css     # @font-face (Inter, Hack)
+│   │   ├── style.css     # Main UI styles
+│   │   ├── terminal.css  # Terminal component styles
+│   │   └── theme.css     # Theme variables (--color-*)
 │   └── js/
-│       ├── backup.js              # Backup modal UI
-│       ├── terminal/              # Terminal component
-│       │   ├── terminal.js        # Terminal class, history, commands
-│       │   └── console.js         # Console interception
-│       ├── runtime/               # microStudio Runtime (adapted)
-│       │   ├── runtime.js         # Main Runtime class, game loop
-│       │   ├── screen.js          # 2D rendering, input handling
-│       │   ├── microvm.js         # microScript VM, storage
-│       │   ├── watcher.js         # Variable watching for debugging
-│       │   ├── player.js          # Runtime controller, message passing
-│       │   ├── sprite.js          # Sprite animation handling
-│       │   ├── map.js             # Tilemap rendering
-│       │   ├── assetmanager.js    # Asset loading (fonts, models, wasm)
+│       ├── terminal/             # Terminal component
+│       │   └── terminal.js       # Terminal implementation
+│       ├── util/                 # Utilities
+│       │   └── canvas2d.js       # Canvas 2D utilities
+│       ├── runtime/              # microStudio Runtime (adapted)
+│       │   ├── runtime.js        # Main Runtime class, game loop
+│       │   ├── screen.js         # 2D rendering, input handling
+│       │   ├── microvm.js        # microScript VM, storage
+│       │   ├── watcher.js        # Variable watching for debugging
+│       │   ├── player.js         # Runtime controller, message passing
+│       │   ├── sprite.js         # Sprite animation handling
+│       │   ├── map.js            # Tilemap rendering
+│       │   ├── msimage.js        # Image handling
+│       │   ├── game.js           # Game state management
+│       │   ├── timemachine.js    # Time travel debugging
+│       │   ├── system.js         # System API
+│       │   ├── storage.js        # Storage API
+│       │   ├── random.js         # Random utilities
+│       │   ├── gamepad.js        # Gamepad input
+│       │   ├── keyboard.js       # Keyboard input
+│       │   ├── assetmanager.js   # Asset loading (fonts, models, wasm)
 │       │   └── audio/
-│       │       ├── audio.js       # WebAudio API wrapper
-│       │       └── beeper.js      # audio.beep() implementation
+│       │       ├── audio.js      # WebAudio API wrapper
+│       │       ├── beeper.js     # audio.beep() implementation
+│       │       ├── music.js      # Music playback
+│       │       └── sound.js      # Sound playback
 │       └── languages/microscript/v2/
-│           ├── compiler.js        # microScript compiler
-│           └── tokenizer.js       # Lexer
+│           ├── compiler.js       # microScript compiler
+│           ├── tokenizer.js      # Lexer
+│           ├── token.js          # Token definition
+│           ├── parser.js         # Parser
+│           ├── processor.js      # Code processor
+│           ├── runner.js         # Runner
+│           ├── routine.js        # Routines
+│           ├── program.js        # Program
+│           └── transpiler.js     # Transpiler
 └── src/
-    ├── config.js          # Project TOML config + registry management
+    ├── config.js          # Project TOML config (no registry)
     ├── backup.js          # Backup/restore + import/export
     ├── trash.js           # Deleted project management (30-day retention)
     ├── update.js          # Self-update functionality
@@ -68,19 +97,55 @@ microrunner/
 
 ## Architecture
 
+### CLI (`cli.js`)
+
+| Command | Description |
+|---------|-------------|
+| `microrunner` or `microrunner help` | Show help |
+| `microrunner init` | Initialize new project in empty folder (interactive - asks for name/slug) |
+| `microrunner import <file.zip>` | Import project from microStudio ZIP file |
+| `microrunner start` | Scan sprites, start server, open game runner at `/:slug` |
+| `microrunner version` | Show version |
+
+**Init behavior:**
+- Checks if folder is empty
+- If not empty, shows error and exits
+- Asks for project name (default: folder name)
+- Asks for slug (default: auto-generated)
+- Creates directory structure
+- Copies template files (`icon.png`, `main.ms`)
+- Creates `project.toml`
+
+**Import behavior:**
+- Takes ZIP file path as argument
+- Imports project to current directory or specified path
+- Handles both microStudio ZIP and microRunner backup formats
+- Auto-generates unique slug if needed
+
+**Start behavior:**
+- Searches for `project.toml` in current folder
+- Reads `slug` from config
+- Finds available port (starts at 3000)
+- Spawns `server.js --project-path=<path> --port=<port>`
+- Opens browser to `http://localhost:${port}/${slug}`
+
 ### Server (`server.js`)
 - Express server with chokidar file watchers
 - WebSocket server for hot reload and logging
 - Path validation middleware for security
 - MTIME caching (5s TTL) for modification time tracking
 - Config caching (30s TTL) for project.toml parsing
+- `--project-path` argument for project location
+- `--port` argument for server port
+- Graceful shutdown handling (SIGTERM, SIGINT)
+- Shutdown marker for clean process termination
 
 ### Runtime (`static/js/runtime/runtime.js`)
 - **Game Loop**: `requestAnimationFrame` based, 60fps default
 - **Update/Draw Cycle**: `update()` -> `draw()` pattern per frame
 - **Hot Reload**: File watchers trigger code updates via WebSocket
 - **Input Handling**: Keyboard, gamepad, mouse, touch
-- **API Exposure**: screen, audio, keyboard, gamepad, sprites, sounds, music, maps, assets, asset_manager, storage, system
+- **API Exposure**: screen, audio, keyboard, gamepad, sprites, sounds, music, maps, assets, asset_manager, storage, system, game, timemachine, random
 
 ### MicroVM (`static/js/runtime/microvm.js`)
 - microScript v2 interpreter
@@ -104,30 +169,23 @@ microrunner/
 
 ## API Endpoints
 
-### Project Management
+### Project
 
 | Endpoint | Method | Purpose |
 |----------|--------|---------|
-| `/api/projects` | GET | List all projects with metadata |
-| `/api/projects` | POST | Create new project |
+| `/:project` | GET | Serve game runner (game.html) |
+| `/` | GET | Serve homepage (index.html) |
 | `/api/project/:name` | GET | Get project config and files |
-| `/api/project/:name` | DELETE | Move project to trash folder |
-| `/api/project/:name/config` | PUT | Update project config |
-| `/api/project/:name/note` | GET | Get project note (Markdown) |
-| `/api/project/:name/note` | PUT | Save project note |
-| `/api/project/:name/note` | DELETE | Delete project note |
-| `/api/project/open` | POST | Open existing folder, resolve slug conflicts |
-| `/api/project/:name/duplicate` | POST | Duplicate project |
-| `/api/project/:name/duplicate/preview` | GET | Preview duplicate settings |
+| `/api/project/:slug/path` | GET | Get project path |
 
 ### Sprites/Media
 
 | Endpoint | Method | Purpose |
 |----------|--------|---------|
-| `/api/sprite/:project/*` | GET | Serve sprite images |
+| `/api/sprite/:project/*` | GET | Serve sprite images (png, jpg, jpeg) |
 | `/api/map/:project/*` | GET | Serve map JSON files |
-| `/api/sound/:project/*` | GET | Serve sound files (wav, mp3, ogg, flac) |
-| `/api/music/:project/*` | GET | Serve music files |
+| `/api/sound/:project/*` | GET | Serve sound files (wav, ogg, flac) |
+| `/api/music/:project/*` | GET | Serve music files (mp3, ogg, flac) |
 | `/api/assets/:project/*` | GET | Serve asset files |
 
 ### File Access
@@ -146,9 +204,9 @@ microrunner/
 | `/api/project/:name/backups/:file` | DELETE | Delete backup |
 | `/api/project/:name/backups/:file/download` | GET | Download backup |
 | `/api/project/:name/backups/:file/note` | GET/PUT/DELETE | Backup notes CRUD |
+| `/api/project/:name/backups/upload` | POST | Upload backup ZIP |
 | `/api/project/:name/restore` | POST | Restore from backup |
 | `/api/project/:name/restore-upload` | POST | Restore from uploaded ZIP |
-| `/api/project/:name/backups/upload` | POST | Upload backup ZIP |
 
 ### Import/Export
 
@@ -157,24 +215,20 @@ microrunner/
 | `/api/import-project` | POST | Import project from ZIP |
 | `/api/import-project/preview` | POST | Preview imported config |
 
+### Notes
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/project/:name/note` | GET | Get project note content |
+| `/api/project/:name/note` | PUT | Save project note |
+| `/api/project/:name/note` | DELETE | Delete project note |
+
 ### Utilities
 
 | Endpoint | Method | Purpose |
 |----------|--------|---------|
-| `/api/default-path` | GET | Get default project path |
-| `/api/unique-folder-name` | GET | Generate unique folder name |
-| `/api/slug-exists` | GET | Check if slug exists |
-| `/api/documents-path` | GET | Get OS documents path |
-| `/api/system/pick-folder` | GET | Native OS folder picker dialog |
 | `/api/version` | GET | Check for updates |
 | `/api/update/download` | GET | Download and install update |
-
-### Routing
-
-| Endpoint | Method | Purpose |
-|----------|--------|---------|
-| `/:project` | GET | Serve game runner (game.html) |
-| `/` | GET | Serve project browser (index.html) |
 
 ### WebSocket
 
@@ -188,7 +242,7 @@ microrunner/
 
 ```javascript
 {
-  microrunnerVersion: "1.0-beta-4",
+  microrunnerVersion: "1.0-beta-5",
   meta: {
     name: "Project Name",
     slug: "project-slug",
@@ -212,24 +266,13 @@ microrunner/
 
 | Function | Purpose | Returns |
 |----------|---------|---------|
-| `read(projectPath)` | Parse project.toml | Config object |
+| `read(projectPath)` | Parse project.toml | Config object (async) |
 | `write(projectPath, config)` | Write project.toml | - |
 | `createConfig(name, slug, options)` | Create new config | Config object |
 | `syncSprites(projectPath)` | Scan sprites dir, auto-detect frames | - |
 | `getSpriteProperties(spriteName, projectPath)` | Get sprite frames/fps | Object |
 | `detectSpriteFrames(spritePath, direction)` | Detect animation frames | Number |
 | `touch(projectPath)` | Update lastModified | - |
-| `generateDefaultProjectPath(baseName)` | Get Documents/ path | String |
-| `generateUniqueFolderName(baseName)` | Get unique folder name | String |
-| `getDocumentsPath()` | Get OS documents path | String |
-| `readProjectsToml()` | Read registry | `{ projects: { paths: [] } }` |
-| `writeProjectsToml(data)` | Write registry | - |
-| `addProject(slug, path)` | Add to registry | - |
-| `removeProject(slug)` | Remove from registry | - |
-| `getProjectPath(slug)` | Get path by slug | String |
-| `getAllProjects()` | List all projects | Array |
-| `cleanStaleProjects()` | Remove missing paths | - |
-| `updateProjectSlug(old, new, path)` | Update slug in registry | - |
 | `toProjectJson(config)` | Convert to microStudio format | Object |
 | `fromProjectJson(json)` | Import from microStudio | Config object |
 
@@ -260,7 +303,7 @@ microrunner/
 | `uploadBackupToArchive(project, zip)` | Upload backup ZIP | - |
 | `duplicateProject(project, options)` | Duplicate project | `{ success, slug, name, path }` |
 | `getDuplicatePreview(project)` | Preview duplicate | Suggested config |
-| `getProjectPath(project)` | Get project path | String |
+| `getProjectPath(project)` | Get project path (searches for project.toml) | String |
 
 ### Archive Structure
 
@@ -339,37 +382,40 @@ Project notes stored as Markdown files alongside project files.
 | `deleteNote(projectPath)` | Delete note file | - |
 | `noteExists(projectPath)` | Check if note exists | Boolean |
 
-### API Endpoints
-
-| Endpoint | Method | Purpose |
-|----------|--------|---------|
-| `/api/project/:name/note` | GET | Get project note content |
-| `/api/project/:name/note` | PUT | Save project note |
-| `/api/project/:name/note` | DELETE | Delete project note |
-
-### Frontend Features
-
-- **Note icon** (fa-sticky-note) in project card header
-- **Color indicator** - icon uses accent color when note exists
-- **Inline editing** - click icon to edit note in card
-- **Fullscreen mode** - expand icon for larger editor
-- **ESC key** - exits note mode with unsaved changes warning
-- **Unsaved changes dialog** - warns before discarding
-
 ## Common Workflows
 
-### Project Creation
-1. User provides name, slug, path in Create modal
-2. Server validates slug uniqueness via `/api/slug-exists`
-3. Creates directory structure: `ms/`, `sprites/`, `assets/`
-4. Copies template files: `icon.png`, `BitCell.ttf`, `main.ms`
-5. Creates `project.toml` with config
-6. Adds entry to `projects.toml` registry
-7. Reloads project list on client
+### Project Initialization
+1. User navigates to empty project folder
+2. Runs `microrunner init`
+3. CLI checks if folder is empty (error if not)
+4. CLI asks for project name (default: folder name)
+5. CLI asks for slug (default: auto-generated from name)
+6. Creates directory structure: `ms/`, `sprites/`, `assets/`, `maps/`, `music/`, `sounds/`
+7. Copies template files: `icon.png`, `main.ms`
+8. Creates `project.toml` with config
+9. Runs `config.syncSprites()` to detect sprite frames
+
+### Project Import
+1. User downloads microStudio project ZIP
+2. Runs `microrunner import project.zip`
+3. CLI extracts ZIP to current folder
+4. Parses `project.json` metadata
+5. Converts to TOML format
+6. Generates unique slug if needed
+7. Copies all project files preserving structure
+8. Shows success message with path
+
+### Starting Development Server
+1. User runs `microrunner start` in project folder
+2. CLI scans `sprites/` directory and syncs with `project.toml`
+3. CLI reads `project.toml` to get slug
+4. CLI finds available port (3000+)
+5. CLI spawns `server.js --project-path=<cwd> --port=<port>`
+6. CLI opens browser to `http://localhost:${port}/${slug}`
 
 ### Hot Reload
 1. User edits `.ms` file in external IDE
-2. Server `chokidar` detects change (recursive: true)
+2. Server `chokidar` detects change in `ms/` directory
 3. Server broadcasts `update` message via WebSocket
 4. Client receives message with file path and content
 5. Client calls `runtime.updateSource(file, code)`
@@ -390,8 +436,7 @@ Project notes stored as Markdown files alongside project files.
 5. Convert to TOML format with `fromProjectJson()`
 6. Copy files preserving case
 7. Generate unique slug if needed
-8. Register in `projects.toml`
-9. Show success modal
+8. Show success modal
 
 ### Backup Flow
 1. Collect all project files
@@ -406,16 +451,7 @@ Project notes stored as Markdown files alongside project files.
 2. Server calls `trash.moveToTrash(projectPath, slug)`
 3. Project folder renamed to `{slug}_{YYYYMMDD}_{HHMMSS}`
 4. Moved to `microrunner/trash/` folder
-5. Entry removed from `projects.toml` registry
-6. On server restart: `trash.emptyExpiredTrash()` removes folders older than 30 days
-
-### Note Workflow
-1. User clicks note icon (fa-sticky-note) on project card
-2. Card transforms into note editor with project icon and name
-3. User edits note content in textarea
-4. Click "Save" to persist to `{projectPath}/note.md`
-5. Click "Cancel" or ESC to exit (with warning if unsaved changes)
-6. Click expand icon to open fullscreen note editor
+5. On server restart: `trash.emptyExpiredTrash()` removes folders older than 30 days
 
 ## Key Constants
 
@@ -428,17 +464,76 @@ Project notes stored as Markdown files alongside project files.
 | CURSOR_HIDE_TIMEOUT_MS | 4000 | Hide cursor after inactivity |
 | Backup filename format | `{slug}_{YYYYMMDD}_{HHMMSS}_{suffix}.zip` | - |
 | TRASH_RETENTION_DAYS | 30 | Trash retention period (days) |
-| Modal width (default) | 480px | All form modals |
-| Modal width (backups) | 640px | Backup list modal |
-| Modal width (note expanded) | 860px | Fullscreen note editor |
+
+### Restart Script (`restart.js`)
+
+Auto-restart script for automatic server restart after updates.
+
+**Features:**
+- Platform detection (Windows: PowerShell, macOS/Linux: sh)
+- Automatic `npm install && npm start` execution
+- Logging to `logs/restart.log` with timestamps
+- UTF-8 encoding support on Windows (`chcp 65001`)
+- Error handling and verification of npm install success
+
+**Platform-specific behavior:**
+
+| Platform | Command | Parameters |
+|----------|---------|------------|
+| **Windows** | `powershell` | `-NoProfile -ExecutionPolicy Bypass` |
+| **macOS/Linux** | `sh -c` | Detached process |
+
+**Log file format:**
+```
+[ISO-timestamp] message
+```
+
+**Error logging:**
+- `ERROR:` prefix for stderr output
+- `SPAWN ERROR:` for process spawn errors
+- `FATAL:` for critical errors
 
 ### Auto-Update Behavior
+
+- Auto-update flow:
+  1. User clicks "Download Update" in UI
+  2. Server downloads ZIP from GitHub
+  3. Server extracts and installs files
+  4. Server automatically restarts via `restart.js`
+  5. UI shows "Lost connection" during restart (expected behavior)
+  6. UI reconnects automatically when server is back
+
 - `excludePatterns` in server.js protects these folders/files during updates:
-  - `projects.toml` - Project registry
   - `node_modules` - Dependencies
   - `logs` - Log files
   - `trash` - Deleted projects (preserved for 30 days)
+  - `restart.js` - IS updated (NOT in excludePatterns)
+
 - On server restart: `trash.emptyExpiredTrash()` permanently deletes expired trashed projects
+
+- Logs: `logs/restart.log` contains auto-restart history with timestamps
+
+- Dev mode detection: If server was started via `npm run dev` (nodemon), auto-restart is skipped and user is prompted to restart manually
+
+- Auto-restart script (`restart.js`):
+  - Detects platform (Windows: PowerShell, macOS/Linux: sh)
+  - Runs `npm install && npm start` automatically
+  - Logs all output to `logs/restart.log`
+  - Handles UTF-8 encoding on Windows (`chcp 65001`)
+  - Verifies `npm install` success via `$LASTEXITCODE` (Windows) or exit code (Unix)
+
+### Server Graceful Shutdown
+
+- **Shutdown Marker**: `.shutdown-{timestamp}` files signal clean shutdown
+- **Signals Handled**: SIGTERM, SIGINT
+- **Cleanup Sequence**:
+  1. Set shuttingDown flag
+  2. Create shutdown marker
+  3. Close all WebSocket clients
+  4. Close file watchers
+  5. Close HTTP server
+  6. Remove shutdown marker
+  7. Exit process
 
 ## Code Style
 
@@ -519,6 +614,33 @@ Project notes stored as Markdown files alongside project files.
 - `storage.clear()` - Clear all
 - Uses browser localStorage
 
+### Game API (`game.*`)
+
+- `game.status` - Current game status (running, paused)
+- `game.projectName` - Name of current project
+- `game.reset()` - Reset game state
+- Game state management and lifecycle
+
+### Time Machine API (`timemachine.*`)
+
+- Time travel debugging feature
+- Record and replay game states
+- Snapshot management
+- State restoration
+
+### Random API (`random.*`)
+
+- `random()` - Random float 0-1
+- `randomInt(min, max)` - Random integer in range
+- Seeded random number generation
+
+### System API (`system.*`)
+
+- `system.javascript(code)` - Execute JavaScript from microScript
+- `system.openURL(url)` - Open URL in browser
+- `system.setUpdateRate(fps)` - Set game update rate
+- `system.exit()` - Close game runner
+
 ### Asset APIs
 
 **Sprites:**
@@ -545,13 +667,6 @@ Project notes stored as Markdown files alongside project files.
 - `asset_manager.loadModel(name)` - Load 3D model
 - `asset_manager.loadWASM(name)` - Load WASM
 
-### System API (`system.*`)
-
-- `system.javascript(code)` - Execute JavaScript from microScript
-- `system.openURL(url)` - Open URL in browser
-- `system.setUpdateRate(fps)` - Set game update rate
-- `system.exit()` - Close game runner
-
 ## Theme System
 
 microRunner uses CSS variables for theming. See `static/css/theme.css`.
@@ -576,13 +691,6 @@ microRunner uses CSS variables for theming. See `static/css/theme.css`.
 
 microRunner uses URL-friendly slugs (kebab-case) for project identification.
 
-### API Endpoints
-
-| Endpoint | Method | Purpose |
-|----------|--------|---------|
-| `/api/slug-exists?slug=` | GET | Check if slug exists |
-| `/api/unique-folder-name?slug=` | GET | Get unique folder name |
-
 ### Validation Rules
 
 - Regex: `/^[a-z0-9-]+$/`
@@ -590,40 +698,44 @@ microRunner uses URL-friendly slugs (kebab-case) for project identification.
 - Dashes for spaces
 - No special characters
 
-### Frontend Functions
+## Homepage (`index.html`)
 
-```javascript
-generateSlug(name)              // Convert name to valid slug
-debounce(func, wait)            // Debounce utility (100ms)
-checkCreateSlugExists(slug)     // Create modal validation
-checkConfigSlugExists(slug)     // Config modal validation
-checkDuplicateSlugExists(slug)  // Duplicate modal validation
-checkImportSlugExists(slug)     // Import modal validation
-saveConfig()                    // Save project config
-openDeleteModal(slug, name)     // Open delete modal
-closeTopmostModal()             // Close topmost modal (ESC or click outside)
-pickFolder(inputId)             // Open folder picker, update input (inputId: "create-path"|"import-path"|"duplicate-path")
-toggleNote(slug)                // Toggle note editor on project card
-saveNote(slug)                  // Save note content
-handleNoteCancel(slug)          // Cancel note editing (with unsaved changes warning)
-expandNote(slug)                // Expand note to fullscreen modal
-closeNoteExpand()               // Close fullscreen note modal
-saveNoteExpand(slug)            // Save note from fullscreen modal
-handleProjectCardClick(slug)    // Handle project card click (skip if in note mode)
-```
+Minimal homepage with:
+- Title: "microRunner"
+- Subtitle: "Local microScript development environment" with GitHub badge for microStudio
+- Version badge
+- Footer with GitHub link to microRunner
 
-### Modal Behavior
+## Game Runner (`game.html`)
 
-| Modal | Width | Slug Editable | Auto-generated | Path Field | Closes on |
-|-------|-------|---------------|----------------|------------|-----------|
-| Create | 480px | Yes | Yes, from name | Auto-unique | ESC, click outside |
-| Configure | 480px | Yes | No | Read-only | ESC, click outside |
-| Duplicate | 480px | Yes | Yes, from name | Auto-unique | ESC, click outside |
-| Import | 480px | Yes | Yes, from filename | Auto-unique | ESC, click outside |
-| Delete | 480px | N/A | N/A | Read-only | ESC, click outside |
-| Backups | 640px | N/A | N/A | N/A | ESC, click outside |
-| Update | 480px | N/A | N/A | N/A | ESC, click outside |
-| Note | Fullscreen | N/A | N/A | N/A | ESC, click outside, Save, Cancel |
+Game runner displays:
+- Project name (from config)
+- Control bar: Play/Pause, Restart
+- Status: Running/Paused
+- Terminal toggle (shows logs, errors, system messages)
+- Project path (bottom right, with `~` shorthand for home directory)
+
+## Terminal Component
+
+Built-in terminal for debugging and monitoring:
+
+**Features:**
+- Real-time log streaming from server
+- Error and warning display
+- Clear terminal output
+- Auto-scroll to latest messages
+- Maximum 10000 lines
+
+**Controls:**
+- Toggle visibility button
+- Clear output
+- Copy logs
+
+**Log Types:**
+- `info` - General information
+- `warn` - Warnings
+- `error` - Errors
+- `debug` - Debug messages
 
 ## Font Loading
 
@@ -633,7 +745,7 @@ microRunner uses a unified approach for loading fonts. See `docs/fonts.md` for d
 
 | Font | Location | Setup Required |
 |------|----------|----------------|
-| **BitCell** | `static/fonts/BitCell.ttf` | No - loaded automatically |
+| **BitCell** | `static/fonts/BitCell.ttf` | No - built-in to runtime |
 | **Inter, Hack** | `static/fonts/` | No - UI fonts only |
 | **Other fonts** | `assets/` | Yes - requires `asset_manager.loadFont()` |
 
@@ -655,6 +767,26 @@ Download "ModernDos.ttf" from microStudio and add it to assets/.
 - Use exact name matching font file
 - `asset_manager.loadFont()` preserves original case
 - `screen.loadFont()` and `screen.isFontReady()` use same case
+
+## UI Icons
+
+microRunner uses Font Awesome for UI icons (vs no icons in microStudio):
+
+**Available Icon Sets:**
+- Solid (`fa-solid-*`)
+- Regular (`fa-regular-*`)
+- Brands (`fa-brands-*`)
+
+**Usage in HTML:**
+```html
+<i class="fas fa-icon-name"></i>
+```
+
+**Common Icons Used:**
+- Play/Pause controls
+- File operations
+- Navigation
+- Social links
 
 ## Security
 
@@ -685,26 +817,40 @@ When syncing from upstream microStudio, preserve these modifications:
 - Sprite scanning uses `{ recursive: true }`
 - Sprite broadcast uses full normalized path with `.png`
 - Projects at `/{slug}` (not `/run/{slug}`)
-- Root `/` serves project browser
+- Root `/` serves simplified homepage
 - Reserved routes: `/api`, `/static`, `/favicon.ico`
 - File watchers use `ignoreInitial: true`
+- Uses `--project-path` argument instead of registry
+- Graceful shutdown handling
+- Shutdown marker files
 
 ### Font Handling
 - Font names case-sensitive (upstream may differ)
 - Only BitCell built-in (upstream has 48 built-ins)
+- BitCell not copied to project assets (runtime handles it)
 - Asset references preserve case in export/backup/import
+
+### UI Enhancements (NOT in microStudio)
+- **Font Awesome icons** for all UI elements
+- **Terminal component** for real-time logging
+- **Time Machine** for debugging (record/replay states)
+- **Game state management** via `game.*` API
+- **Random utilities** via `random.*` API
+- **Enhanced storage** via `storage.*` API
+- **System API** for browser integration
 
 ## Adding New Features
 
-1. **New API endpoint**: Add route in `server.js`, use `validatePath()` for file access
-2. **New runtime function**: Add to `global` object in `startReady()` method in `runtime.js`
-3. **New screen API**: Add method to Screen class in `screen.js`
-4. **New backend module**: Create in `src/`, export functions, import in `server.js`
-5. **Project configuration**: Update `getProjectConfig()` and `project.toml` schema
-6. **New frontend module**: Add to `static/js/`, import in appropriate HTML
+1. **New CLI command**: Add to `cli.js` switch statement
+2. **New API endpoint**: Add route in `server.js`, use `validatePath()` for file access
+3. **New runtime function**: Add to `global` object in `startReady()` method in `runtime.js`
+4. **New screen API**: Add method to Screen class in `screen.js`
+5. **New backend module**: Create in `src/`, export functions, import in `server.js`
+6. **Project configuration**: Update `createConfig()` and `project.toml` schema
 
 ## Useful References
 
 - **microStudio Repository**: https://github.com/pmgl/microstudio
 - **Font Documentation**: `docs/fonts.md`
 - **microStudio Docs**: https://microstudio.dev/documentation/
+- **Font Awesome**: https://fontawesome.com/icons
