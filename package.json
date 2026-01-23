@@ -1,6 +1,6 @@
 {
   "name": "microrunner",
-  "version": "1.0-cli-beta-1",
+  "version": "1.0-cli-beta-2",
   "description": "Local microScript development environment",
   "main": "server.js",
   "bin": {

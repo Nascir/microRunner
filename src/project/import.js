@@ -19,7 +19,7 @@ function safeExtractZip(zipPath, destDir) {
 
   try {
     JSON.parse(projectJsonEntry.getData().toString('utf-8'));
-  } catch (e) {
+  } catch {
     throw new Error('Invalid project.json: cannot parse');
   }
 
@@ -163,7 +163,6 @@ async function previewProject(zipPath) {
   }
 
   const projectJson = JSON.parse(projectJsonEntry.getData().toString('utf-8'));
-  const baseSlug = projectJson.slug || projectJson.title.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
 
   const tomlConfig = config.fromProjectJson(projectJson);
 

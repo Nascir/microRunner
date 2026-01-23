@@ -48,11 +48,13 @@ async function start() {
     const child = spawn(nodePath, args, {
       cwd: PROJECT_ROOT,
       stdio: 'inherit',
-      shell: process.platform === 'win32',
-      windowsVerbatimArguments: process.platform === 'win32',
+      shell: false,
     });
 
     child.on('exit', (code) => {
+      if (sigintReceived) {
+        console.log('🔴 Server stopped.');
+      }
       process.exit(code);
     });
 
@@ -61,6 +63,7 @@ async function start() {
     process.on('SIGINT', () => {
       if (!sigintReceived) {
         sigintReceived = true;
+        console.log('\nStopping server...');
         child.kill('SIGINT');
       }
 
@@ -71,7 +74,7 @@ async function start() {
             for (const f of files) {
               fs.unlinkSync(path.join(PROJECT_ROOT, f));
             }
-          } catch (e) {}
+          } catch {}
         }
       }, 500);
     });

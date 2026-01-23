@@ -3,7 +3,7 @@ const path = require('path');
 const AdmZip = require('adm-zip');
 const config = require('./config');
 const { collect } = require('./files');
-const { PROJECT_ROOT, VERSION } = require('../constants');
+const { VERSION } = require('../constants');
 
 function formatDate(timestamp) {
   const date = new Date(timestamp);
@@ -48,7 +48,7 @@ async function createBackup(project, options = {}) {
   let projectPath;
   try {
     projectPath = await getProjectPath(project);
-  } catch (e) {
+  } catch {
     throw new Error('Project not found');
   }
 
@@ -113,7 +113,7 @@ function listBackups(project) {
     let projectPath;
     try {
       projectPath = await getProjectPath(project);
-    } catch (e) {
+    } catch {
       return resolve([]);
     }
 
@@ -147,7 +147,7 @@ function deleteBackup(project, fileName) {
     let projectPath;
     try {
       projectPath = await getProjectPath(project);
-    } catch (e) {
+    } catch {
       return reject(new Error('Project not found'));
     }
 
@@ -168,7 +168,7 @@ async function restoreProject(project, backupFile, options = {}) {
     let projectPath;
     try {
       projectPath = getProjectPath(project);
-    } catch (e) {
+    } catch {
       throw new Error('Project not found in registry');
     }
 

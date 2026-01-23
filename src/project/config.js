@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { PROJECT_ROOT, VERSION } = require('../constants');
+const { VERSION } = require('../constants');
 
 // Synchronous TOML module load at startup for better performance
 let tomlModule = null;

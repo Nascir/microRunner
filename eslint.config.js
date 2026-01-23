@@ -5,6 +5,7 @@ module.exports = [
       'node_modules/**',
       'static/js/runtime/**',
       'static/js/languages/**',
+      'static/lib/font-awesome/**',
     ],
     languageOptions: {
       ecmaVersion: 2022,

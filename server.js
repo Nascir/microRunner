@@ -7,7 +7,6 @@ const chokidar = require('chokidar');
 const config = require('./src/project/config.js');
 const backup = require('./src/project/backup.js');
 const exportModule = require('./src/project/export.js');
-const importModule = require('./src/project/import.js');
 
 let cliProjectPath = null;
 let cliPort = null;
@@ -22,13 +21,7 @@ for (const arg of process.argv) {
 
 const PORT = cliPort || process.env.PORT || 3000;
 
-function getCachedPackageJson() {
-  return JSON.parse(
-    fs.readFileSync(path.join(__dirname, 'package.json'), 'utf-8'),
-  );
-}
-
-function resolveProjectPath(slug) {
+function resolveProjectPath() {
   if (cliProjectPath) {
     const tomlPath = path.join(cliProjectPath, 'project.toml');
     if (fs.existsSync(tomlPath)) {
@@ -52,8 +45,8 @@ function resolveProjectPath(slug) {
   return null;
 }
 
-function resolveProjectFromToml(slug) {
-  return resolveProjectPath(slug);
+function resolveProjectFromToml() {
+  return resolveProjectPath();
 }
 
 const app = express();
@@ -64,42 +57,8 @@ app.use(express.json());
 app.use(require('express-fileupload')());
 app.use(express.static(path.join(__dirname, 'static')));
 
-const projectClients = new Map();
 const projectSpriteWatchers = new Map();
 const projectWsClients = new Map();
-
-const mtimeCache = new Map();
-const MTIME_CACHE_TTL = 5000;
-
-function getLatestMtime(dir) {
-  const cached = mtimeCache.get(dir);
-  if (cached && Date.now() - cached.timestamp < MTIME_CACHE_TTL) {
-    return cached.mtime;
-  }
-
-  let latest = 0;
-
-  function walk(currentPath) {
-    if (!fs.existsSync(currentPath)) return;
-
-    const stats = fs.statSync(currentPath);
-    if (stats.mtimeMs > latest) {
-      latest = stats.mtimeMs;
-    }
-
-    if (stats.isDirectory()) {
-      const entries = fs.readdirSync(currentPath, { withFileTypes: true });
-      for (const entry of entries) {
-        walk(path.join(currentPath, entry.name));
-      }
-    }
-  }
-
-  walk(dir);
-
-  mtimeCache.set(dir, { mtime: latest, timestamp: Date.now() });
-  return latest;
-}
 
 async function validatePath(projectPath, subdir, userPath) {
   const basePath = path.resolve(projectPath, subdir);
@@ -161,7 +120,7 @@ async function getProjectFiles(projectPath) {
             try {
               const detectedFrames = config.detectSpriteFrames(pngPath, spriteDirection);
               imageObj.properties = { frames: detectedFrames, fps: 5 };
-            } catch (err) {
+            } catch {
               imageObj.properties = { frames: 1, fps: 5 };
             }
           } else {
@@ -335,7 +294,7 @@ wss.on('connection', (ws, req) => {
   ws.project = project;
 
   if (project) {
-    const projectPath = resolveProjectFromToml(project);
+    const projectPath = resolveProjectFromToml();
     if (projectPath) {
       watchProject(projectPath, project);
     }
@@ -348,7 +307,6 @@ wss.on('connection', (ws, req) => {
   ws.on('message', (data) => {
     try {
       const msg = JSON.parse(data);
-      const timestamp = new Date().toISOString();
       const projectTag = ws.project || 'unknown';
 
       if (msg.type === 'log') {
@@ -356,7 +314,7 @@ wss.on('connection', (ws, req) => {
       } else if (msg.type === 'error') {
         console.error(`[${projectTag}] ${msg.data}`);
       }
-    } catch (e) {
+    } catch {
     }
   });
 
@@ -372,8 +330,7 @@ app.get('/', (req, res) => {
 });
 
 app.get('/api/project/:name', async (req, res) => {
-  const slug = req.params.name;
-  const projectPath = resolveProjectFromToml(slug);
+  const projectPath = resolveProjectFromToml();
 
   if (!projectPath) {
     return res.status(404).json({ error: 'Project not found' });
@@ -382,7 +339,7 @@ app.get('/api/project/:name', async (req, res) => {
   let projectConfig;
   try {
     projectConfig = await config.read(projectPath);
-  } catch (e) {
+  } catch {
     return res.status(404).json({ error: 'Project not found' });
   }
 
@@ -402,7 +359,7 @@ app.get('/api/project/:slug/path', (req, res) => {
   if (cliProjectPath) {
     res.json({ path: cliProjectPath });
   } else {
-    const projectPath = resolveProjectFromToml(req.params.slug);
+    const projectPath = resolveProjectFromToml();
     if (projectPath) {
       res.json({ path: projectPath });
     } else {
@@ -412,9 +369,8 @@ app.get('/api/project/:slug/path', (req, res) => {
 });
 
 app.get('/api/file/:project/*', async (req, res) => {
-  const { project } = req.params;
   const file = req.params[0];
-  const projectPath = resolveProjectFromToml(project);
+  const projectPath = resolveProjectFromToml();
   if (!projectPath) {
     return res.status(403).send('Access denied');
   }
@@ -433,7 +389,7 @@ app.get('/api/file/:project/*', async (req, res) => {
 app.get('/api/sprite/:project/*', async (req, res) => {
   const { project } = req.params;
   const spritePath = req.params[0];
-  const projectPath = resolveProjectFromToml(project);
+  const projectPath = resolveProjectFromToml();
   if (!projectPath) {
     return res.status(403).send('Access denied');
   }
@@ -449,9 +405,8 @@ app.get('/api/sprite/:project/*', async (req, res) => {
 });
 
 app.get('/api/map/:project/*', async (req, res) => {
-  const { project } = req.params;
-  const mapPath = req.params[0];
-  const projectPath = resolveProjectFromToml(project);
+  const file = req.params[0];
+  const projectPath = resolveProjectFromToml();
   if (!projectPath) {
     return res.status(403).send('Access denied');
   }
@@ -470,7 +425,7 @@ app.get('/api/map/:project/*', async (req, res) => {
 app.get('/api/sound/:project/*', async (req, res) => {
   const { project } = req.params;
   const soundPath = req.params[0];
-  const projectPath = resolveProjectFromToml(project);
+  const projectPath = resolveProjectFromToml();
   if (!projectPath) {
     return res.status(403).send('Access denied');
   }
@@ -502,7 +457,7 @@ app.get('/api/sound/:project/*', async (req, res) => {
 app.get('/api/music/:project/*', async (req, res) => {
   const { project } = req.params;
   const musicPath = req.params[0];
-  const projectPath = resolveProjectFromToml(project);
+  const projectPath = resolveProjectFromToml();
   if (!projectPath) {
     return res.status(403).send('Access denied');
   }
@@ -530,7 +485,7 @@ app.get('/api/music/:project/*', async (req, res) => {
 app.get('/api/assets/:project/*', async (req, res) => {
   const { project } = req.params;
   const assetPath = req.params[0];
-  const projectPath = resolveProjectFromToml(project);
+  const projectPath = resolveProjectFromToml();
   if (!projectPath) {
     return res.status(403).send('Access denied');
   }
@@ -570,7 +525,7 @@ app.get('/api/project/:name/export', async (req, res) => {
     }
     const result = await exportModule.createExport(projectPath);
     const slug = (await config.read(projectPath)).meta.slug;
-    res.download(result.filePath, `${slug}.zip`, (err) => {
+    res.download(result.filePath, `${slug}.zip`, () => {
       if (fs.existsSync(result.filePath)) {
         fs.unlinkSync(result.filePath);
       }
@@ -711,18 +666,15 @@ server.listen(PORT, '127.0.0.1', () => {
 
 let shuttingDown = false;
 
-function gracefulShutdown(signal) {
+function gracefulShutdown() {
   if (shuttingDown) return;
   shuttingDown = true;
-  
+
   const shutdownMarker = path.join(__dirname, '.shutdown-' + Date.now());
-  
+
   try {
     fs.writeFileSync(shutdownMarker, 'shutdown');
-  } catch (e) {}
-
-  console.log('\nStopping server...');
-  process.stdout.write('\x1B[0m');
+  } catch {}
 
   wss.clients.forEach(client => client.close());
 
@@ -734,10 +686,9 @@ function gracefulShutdown(signal) {
   projectSpriteWatchers.clear();
 
   server.close(() => {
-    console.log('🔴 Server stopped.');
     try {
       if (fs.existsSync(shutdownMarker)) fs.unlinkSync(shutdownMarker);
-    } catch (e) {}
+    } catch {}
     process.exit(0);
   });
 
@@ -745,7 +696,7 @@ function gracefulShutdown(signal) {
     console.log('Forcing shutdown...');
     try {
       if (fs.existsSync(shutdownMarker)) fs.unlinkSync(shutdownMarker);
-    } catch (e) {}
+    } catch {}
     process.exit(1);
   }, 2000);
 }
