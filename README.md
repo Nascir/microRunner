@@ -12,7 +12,6 @@ CLI-based local development environment for microStudio games with hot reload.
 - **Run, pause, restart** game controls
 - **Import/Export** projects in microStudio ZIP format
 - **CLI-first** - full control from terminal
-- **Auto-update** from GitHub
 
 ## Quick Start
 
@@ -33,16 +32,6 @@ microrunner init           # Creates project files in current folder
 microrunner start          # Starts server, opens browser
 ```
 
-### Import from microStudio
-
-```bash
-cd ~/projects
-microrunner import game.zip   # Import microStudio project
-ls                            # Check extracted folder name
-cd <extracted-folder>
-microrunner start
-```
-
 ## CLI Commands
 
 | Command | Description |
@@ -51,6 +40,8 @@ microrunner start
 | `microrunner init` | Create new project in current folder |
 | `microrunner import <file.zip>` | Import from microStudio ZIP |
 | `microrunner start` | Scan sprites and start the server |
+| `microrunner export` | Export project to ZIP |
+| `microrunner backup` | Create backup of the project |
 | `microrunner version` | Show version |
 | `microrunner help` | Show help |
 
@@ -65,7 +56,7 @@ my-game/
 ├── maps/              # Map files (json)
 ├── sounds/            # Sound effects (wav, ogg, flac)
 ├── music/             # Music tracks (mp3, ogg, flac)
-└── assets/            # Fonts, models, other resources
+└── assets/            # Fonts, JSONs, other resources
 ```
 
 ## Development Workflow
@@ -79,7 +70,8 @@ my-game/
 
 ## System Requirements
 
-- Node.js 16.0 or higher
+- Node.js 16.0.0 or higher
+- Git (for installation via `git clone`)
 - Modern browser (Chrome, Firefox, Safari)
 - macOS, Linux, or Windows
 

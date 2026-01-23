@@ -1,8 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-
-const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf-8'));
-const VERSION = pkg.version;
+const { PROJECT_ROOT, VERSION } = require('../constants');
 
 // Synchronous TOML module load at startup for better performance
 let tomlModule = null;
@@ -19,18 +17,9 @@ async function getToml() {
   return tomlModule;
 }
 
-function getOsType() {
-  return process.platform;
-}
-
 function getDocumentsPath() {
-  const os = getOsType();
-  if (os === 'darwin') {
-    return path.join(process.env.HOME || '/Users/unknown', 'Documents');
-  } else if (os === 'win32') {
-    return path.join(process.env.USERPROFILE || 'C:\\Users\\unknown', 'Documents');
-  }
-  return path.join(process.env.HOME || '/home/unknown', 'Documents');
+  const homedir = require('os').homedir();
+  return path.join(homedir, 'Documents');
 }
 
 function generateDefaultProjectPath(baseName) {
@@ -224,6 +213,91 @@ function toProjectJson(config) {
   };
 }
 
+function toMicroStudioJson(config, filesInfo = {}) {
+  const files = {};
+
+  for (const [key, value] of Object.entries(config.sprites || {})) {
+    if (key !== 'direction') {
+      const fileInfo = filesInfo.sprites?.find(f => f.name === key) || {};
+      files[`sprites/${key}`] = {
+        version: 1,
+        size: fileInfo.size || 0,
+        properties: { frames: value.frames, fps: 5 },
+      };
+    }
+  }
+
+  for (const file of filesInfo.sources || []) {
+    files[`ms/${file.name}`] = {
+      version: 1,
+      size: file.size || 0,
+      properties: {},
+    };
+  }
+
+  for (const file of filesInfo.maps || []) {
+    files[`maps/${file.name}`] = {
+      version: 1,
+      size: file.size || 0,
+      properties: {},
+    };
+  }
+
+  for (const file of filesInfo.sounds || []) {
+    files[`sounds/${file.name}`] = {
+      version: 1,
+      size: file.size || 0,
+      properties: {},
+    };
+  }
+
+  for (const file of filesInfo.music || []) {
+    files[`music/${file.name}`] = {
+      version: 1,
+      size: file.size || 0,
+      properties: {},
+    };
+  }
+
+  for (const file of filesInfo.assets || []) {
+    files[`assets/${file.name}`] = {
+      version: 1,
+      size: file.size || 0,
+      properties: {},
+    };
+  }
+
+  for (const file of filesInfo.docs || []) {
+    files[`doc/${file.name}`] = {
+      version: 1,
+      size: file.size || 0,
+      properties: {},
+    };
+  }
+
+  return {
+    owner: 'local',
+    title: config.meta.name,
+    slug: config.meta.slug,
+    orientation: config.settings.orientation,
+    aspect: config.settings.aspect,
+    spriteDirection: config.sprites.direction,
+    graphics: config.settings.graphics?.toUpperCase() || 'M1',
+    language: config.settings.language,
+    controls: ['touch', 'mouse'],
+    platforms: ['computer', 'phone', 'tablet'],
+    type: 'app',
+    tags: [],
+    networking: false,
+    libs: [],
+    date_created: Date.now(),
+    last_modified: Date.now(),
+    first_published: 0,
+    description: '',
+    files,
+  };
+}
+
 function fromProjectJson(json, options = {}) {
   const sprites = { direction: json.spriteDirection || 'vertical' };
   for (const [key, value] of Object.entries(json.files || {})) {
@@ -286,6 +360,7 @@ module.exports = {
   read,
   write,
   toProjectJson,
+  toMicroStudioJson,
   fromProjectJson,
   createConfig,
   syncSprites,

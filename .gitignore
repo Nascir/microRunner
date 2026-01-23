@@ -3,5 +3,5 @@ node_modules/
 *.log
 logs/
 package-lock.json
-projects.toml
-trash/
+audit/
+dev/

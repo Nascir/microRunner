@@ -104,54 +104,6 @@
   margin: 2px 0;
 }
 
-#terminal-input-line {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 30px;
-  background: var(--color-terminalBg);
-  display: none;
-}
-
-#terminal-input-gt {
-  position: absolute;
-  left: 5px;
-  width: 20px;
-  top: 0;
-  bottom: 0;
-  font-family: "Hack", monospace;
-  font-size: 16px;
-  color: var(--color-terminalSystem);
-  padding: 7px 5px;
-}
-
-#terminal-input-container {
-  position: absolute;
-  bottom: 0;
-  left: 30px;
-  right: 0;
-  height: 30px;
-  border: none;
-  background: transparent;
-}
-
-#terminal-input {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  top: 0;
-  border: none;
-  width: 100%;
-  background: transparent;
-  font-family: "Hack", monospace;
-  font-size: 14px;
-  color: var(--color-terminalText);
-  outline: none;
-  padding: 0 5px;
-}
-
 #terminal-notification {
   display: none;
   color: var(--color-terminalSystem);

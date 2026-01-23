@@ -1,7 +1,7 @@
 {
   "ignore": [
-    "projects/**/*.json",
-    "archive/**",
+    "backup/**",
+    "export/**",
     "temp_*"
   ],
   "delay": 500
