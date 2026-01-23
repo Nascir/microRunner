@@ -63,7 +63,7 @@ async function start() {
     process.on('SIGINT', () => {
       if (!sigintReceived) {
         sigintReceived = true;
-        console.log('\nStopping server...');
+        console.log('\rStopping server...');
         child.kill('SIGINT');
       }
 
