@@ -49,6 +49,7 @@ async function start() {
       cwd: PROJECT_ROOT,
       stdio: 'inherit',
       shell: process.platform === 'win32',
+      windowsVerbatimArguments: process.platform === 'win32',
     });
 
     child.on('exit', (code) => {
