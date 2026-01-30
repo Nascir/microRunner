@@ -11,7 +11,7 @@
   try {
     if (typeof window !== 'undefined') _WINDOW = window;
     if (typeof document !== 'undefined') _DOCUMENT = document;
-  } catch (e) {} // eslint-disable-line no-empty
+  } catch (e) {}
 
   var _ref = _WINDOW.navigator || {},
     _ref$userAgent = _ref.userAgent,
@@ -1256,7 +1256,7 @@
   try {
     if (typeof window !== 'undefined') _WINDOW = window;
     if (typeof document !== 'undefined') _DOCUMENT = document;
-  } catch (e) {} // eslint-disable-line no-empty
+  } catch (e) {}
 
   var _ref = _WINDOW.navigator || {},
     _ref$userAgent = _ref.userAgent,
@@ -2157,7 +2157,7 @@
   try {
     if (typeof window !== 'undefined') _WINDOW = window;
     if (typeof document !== 'undefined') _DOCUMENT = document;
-  } catch (e) {} // eslint-disable-line no-empty
+  } catch (e) {}
 
   var _ref = _WINDOW.navigator || {},
     _ref$userAgent = _ref.userAgent,
@@ -4544,7 +4544,7 @@
     if (typeof document !== 'undefined') _DOCUMENT = document;
     if (typeof MutationObserver !== 'undefined') _MUTATION_OBSERVER = MutationObserver;
     if (typeof performance !== 'undefined') _PERFORMANCE = performance;
-  } catch (e) {} // eslint-disable-line no-empty
+  } catch (e) {}
 
   var _ref = _WINDOW.navigator || {},
     _ref$userAgent = _ref.userAgent,
@@ -7572,7 +7572,7 @@
       var cleanSelectors = Array.from(selectorSet).join(', ');
       try {
         nodeList = root.querySelectorAll(cleanSelectors);
-      } catch (_unused) {} // eslint-disable-line no-empty
+      } catch (_unused) {}
     }
     return new Promise(function (resolve, reject) {
       var operations = toArray(nodeList).filter(processable).map(replace);

@@ -91,7 +91,7 @@
   try {
     if (typeof window !== 'undefined') _WINDOW = window;
     if (typeof document !== 'undefined') _DOCUMENT = document;
-  } catch (e) {} // eslint-disable-line no-empty
+  } catch (e) {}
 
   var _ref = _WINDOW.navigator || {},
     _ref$userAgent = _ref.userAgent,
@@ -598,7 +598,7 @@
             if (nextCumulativeDuration <= maxDuration) {
               poll(nextDuration, nextCumulativeDuration);
             } else {
-              reject('timeout'); // eslint-disable-line prefer-promise-reject-errors
+              reject('timeout');
             }
           }
         }, duration);

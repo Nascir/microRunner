@@ -27,17 +27,6 @@ this.Runner = class Runner {
       }
     };
     this.microvm.context.global.List = {
-      sortList: (f) => {
-        var funk;
-        if ((f != null) && f instanceof Program.Function) {
-          funk = function(a, b) {
-            return f.call(this.microvm.context.global, [a, b], true);
-          };
-        } else if ((f != null) && typeof f === "function") {
-          funk = f;
-        }
-        return this.sort(funk);
-      },
       "+": function(a, b, self) {
         if (!self) { // not +=, clone array a
           a = [...a];

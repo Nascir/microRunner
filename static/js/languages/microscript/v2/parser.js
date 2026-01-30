@@ -196,7 +196,7 @@ this.Parser = (function() {
           return this.parseSelfAssignment(token, expression, token.type);
         case Token.TYPE_DIVIDE_EQUALS:
           return this.parseSelfAssignment(token, expression, token.type);
-        case Token.TYPE_MODULO_EQUALS:
+case Token.TYPE_MODULO_EQUALS:
         case Token.TYPE_AND_EQUALS:
         case Token.TYPE_OR_EQUALS:
           return this.parseSelfAssignment(token, expression, token.type);

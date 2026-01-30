@@ -14,7 +14,7 @@ async function main() {
     await init();
     break;
   case 'start':
-    await start();
+    await start(process.argv[3] === '--chrome');
     break;
   case 'import':
     await importCommand();

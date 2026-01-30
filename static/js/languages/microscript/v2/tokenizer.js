@@ -17,17 +17,17 @@ this.Tokenizer = class Tokenizer {
     this.chars["^"] = Token.TYPE_POWER;
     this.chars[","] = Token.TYPE_COMMA;
     this.chars["."] = Token.TYPE_DOT;
-    this.doubles = {};
-    this.doubles[">"] = [Token.TYPE_GREATER, Token.TYPE_GREATER_OR_EQUALS];
-    this.doubles["<"] = [Token.TYPE_LOWER, Token.TYPE_LOWER_OR_EQUALS];
-    this.doubles["="] = [Token.TYPE_EQUALS, Token.TYPE_DOUBLE_EQUALS];
-    this.doubles["+"] = [Token.TYPE_PLUS, Token.TYPE_PLUS_EQUALS];
-    this.doubles["-"] = [Token.TYPE_MINUS, Token.TYPE_MINUS_EQUALS];
-    this.doubles["*"] = [Token.TYPE_MULTIPLY, Token.TYPE_MULTIPLY_EQUALS];
-    this.doubles["/"] = [Token.TYPE_DIVIDE, Token.TYPE_DIVIDE_EQUALS];
-    this.doubles["%"] = [Token.TYPE_MODULO, Token.TYPE_MODULO_EQUALS];
-    this.doubles["&"] = [Token.TYPE_BINARY_AND, Token.TYPE_AND_EQUALS];
-    this.doubles["|"] = [Token.TYPE_BINARY_OR, Token.TYPE_OR_EQUALS];
+this.doubles = {};
+this.doubles[">"] = [Token.TYPE_GREATER, Token.TYPE_GREATER_OR_EQUALS];
+this.doubles["<"] = [Token.TYPE_LOWER, Token.TYPE_LOWER_OR_EQUALS];
+this.doubles["="] = [Token.TYPE_EQUALS, Token.TYPE_DOUBLE_EQUALS];
+this.doubles["+"] = [Token.TYPE_PLUS, Token.TYPE_PLUS_EQUALS];
+this.doubles["-"] = [Token.TYPE_MINUS, Token.TYPE_MINUS_EQUALS];
+this.doubles["*"] = [Token.TYPE_MULTIPLY, Token.TYPE_MULTIPLY_EQUALS];
+this.doubles["/"] = [Token.TYPE_DIVIDE, Token.TYPE_DIVIDE_EQUALS];
+this.doubles["%"] = [Token.TYPE_MODULO, Token.TYPE_MODULO_EQUALS];
+this.doubles["&"] = [Token.TYPE_BINARY_AND, Token.TYPE_AND_EQUALS];
+this.doubles["|"] = [Token.TYPE_BINARY_OR, Token.TYPE_OR_EQUALS];
     this.shifts = {
       "<": Token.TYPE_SHIFT_LEFT,
       ">": Token.TYPE_SHIFT_RIGHT
@@ -262,14 +262,14 @@ this.Tokenizer = class Tokenizer {
     var c;
     while (true) {
       if (this.index >= this.input.length) {
-        return new Token(this, Token.TYPE_NUMBER, Number.parseInt(s), s);
+        return new Token(this, Token.TYPE_NUMBER, Number.parseInt(s, 16), s);
       }
       c = this.nextChar();
       if (/[a-fA-F0-9]/.test(c)) {
         s += c;
       } else {
         this.rewind();
-        return new Token(this, Token.TYPE_NUMBER, Number.parseInt(s), s);
+        return new Token(this, Token.TYPE_NUMBER, Number.parseInt(s, 16), s);
       }
     }
   }

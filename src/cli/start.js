@@ -3,10 +3,11 @@ const fs = require('fs');
 const http = require('http');
 const { spawn } = require('child_process');
 const open = require('open');
+const { apps } = require('open');
 const config = require('../project/config');
 const { PROJECT_ROOT } = require('../constants');
 
-async function start() {
+async function start(chromeFlag = false) {
   const cwd = process.cwd();
   const tomlPath = path.join(cwd, 'project.toml');
 
@@ -19,7 +20,9 @@ async function start() {
   const projectConfig = await config.read(cwd);
   const slug = projectConfig.meta.slug;
 
-  console.log('Checking for sprite changes...');
+  process.stdout.write('\x1Bc');
+  console.log('🎮 microRunner is launching...');
+  console.log('👀 Checking for sprite changes...');
   await config.syncSprites(cwd);
 
   const startPort = 3000;
@@ -82,7 +85,11 @@ async function start() {
     setTimeout(async () => {
       const url = `http://localhost:${port}/${slug}`;
       try {
-        await open.default(url);
+        if (chromeFlag) {
+          await open.default(url, { app: { name: apps.chrome } });
+        } else {
+          await open.default(url);
+        }
       } catch (e) {
         console.error(`Failed to open browser: ${e.message}`);
       }

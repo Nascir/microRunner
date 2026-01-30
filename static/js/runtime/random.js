@@ -26,7 +26,8 @@ Random = (function() {
 
   Random.prototype.next = function() {
     this._seed = (this._seed * this.a + this.b) & this.mask;
-    return this._seed * this.norm;
+    // Return [0, 1] instead of [0, 1) by dividing by (size - 1)
+    return this._seed / (this.size - 1);
   };
 
   Random.prototype.nextInt = function(num) {

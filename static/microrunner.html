@@ -878,6 +878,9 @@
       if (runtime) {
         clearTerminal();
         printToTerminal('<i class="fas fa-redo"></i> Restart', 'system');
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: 'restart' }));
+        }
         runtime.stop();
         initGame();
       }

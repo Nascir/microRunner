@@ -7,11 +7,11 @@ CLI-based local development environment for microStudio games with hot reload.
 ## Features
 
 - **microScript 2.0 compatible** - full compiler, runtime, and all APIs
-- **Hot reload** - changes appear instantly via WebSocket (no page refresh)
-- **Integrated terminal** - print() output, warnings, errors and debugging
+- **Both system and web-view terminal support** - print() output
 - **Run, pause, restart** game controls
+- **Hot reload** - changes appear instantly via WebSocket (no page refresh)
 - **Import/Export** projects in microStudio ZIP format
-- **CLI-first** - full control from terminal
+- **CLI** - run microRunner server inside your project
 
 ## Quick Start
 
