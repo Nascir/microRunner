@@ -418,11 +418,11 @@ this.msImage = (function() {
       var args, i, j, len, ref, transform;
       args = arguments;
       this.initContext();
-      if (args.length > 0 && args.length % 2 === 1 && typeof args[args.length - 1] === "string") {
+      if (args.length > 0 && args.length % 2 === 1) {
         this.setColor(args[args.length - 1]);
       }
       if (Array.isArray(args[0])) {
-        if ((args[1] != null) && typeof args[1] === "string") {
+        if ((args[1] != null)) {
           this.setColor(args[1]);
         }
         args = args[0];
@@ -449,11 +449,11 @@ this.msImage = (function() {
       var args, i, j, len, ref, transform;
       args = arguments;
       this.initContext();
-      if (args.length > 0 && args.length % 2 === 1 && typeof args[args.length - 1] === "string") {
+      if (args.length > 0 && args.length % 2 === 1) {
         this.setColor(args[args.length - 1]);
       }
       if (Array.isArray(args[0])) {
-        if ((args[1] != null) && typeof args[1] === "string") {
+        if ((args[1] != null)) {
           this.setColor(args[1]);
         }
         args = args[0];
@@ -481,11 +481,11 @@ this.msImage = (function() {
       var args, i, j, len, ref, transform;
       args = arguments;
       this.initContext();
-      if (args.length > 0 && args.length % 2 === 1 && typeof args[args.length - 1] === "string") {
+      if (args.length > 0 && args.length % 2 === 1) {
         this.setColor(args[args.length - 1]);
       }
       if (Array.isArray(args[0])) {
-        if ((args[1] != null) && typeof args[1] === "string") {
+        if ((args[1] != null)) {
           this.setColor(args[1]);
         }
         args = args[0];

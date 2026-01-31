@@ -1,4 +1,4 @@
-var arrayBufferToBase64, loadFile, loadLameJSLib, loadWaveFileLib, saveFile, writeProjectFile;
+var loadFile, loadWaveFileLib, saveFile;
 
 this.Runtime = class Runtime {
   constructor(url1, sources, resources, listener, canvas, options = {}) {
@@ -281,9 +281,6 @@ this.Runtime = class Runtime {
     this.vm.context.global.system.disable_autofullscreen = 0;
     this.vm.context.global.system.file = System.file;
     this.vm.context.global.system.javascript = System.javascript;
-    if (window.ms_in_editor) {
-      this.vm.context.global.system.project = new ProjectInterface(this).interface;
-    }
     System.runtime = this;
     ref1 = this.sources;
     for (file in ref1) {
@@ -724,14 +721,12 @@ this.Runtime = class Runtime {
     } else {
       this.touch.release = 0;
     }
-    this.vm.context.global.system.file.dropped = 0;
+    this.vm.context.global.system.file.dropped = this.files_dropped || this.vm.context.global.system.file.dropped;
     if (this.files_dropped != null) {
-      this.vm.context.global.system.file.dropped = this.files_dropped;
       delete this.files_dropped;
     }
-    this.vm.context.global.system.file.loaded = 0;
+    this.vm.context.global.system.file.loaded = this.files_loaded || this.vm.context.global.system.file.loaded;
     if (this.files_loaded != null) {
-      this.vm.context.global.system.file.loaded = this.files_loaded;
       delete this.files_loaded;
     }
     this.gamepad.update();
@@ -884,40 +879,6 @@ loadWaveFileLib = function (callback) {
   }
 };
 
-loadLameJSLib = function (callback) {
-  var s;
-  if (typeof lamejs !== "undefined" && lamejs !== null) {
-    return callback();
-  } else {
-    s = document.createElement("script");
-    s.src = location.origin + "/lib/lamejs/lame.min.js";
-    document.head.appendChild(s);
-    return s.onload = function () {
-      return callback();
-    };
-  }
-};
-
-writeProjectFile = function (name, data, thumb) {
-  return window.player.postMessage({
-    name: "write_project_file",
-    filename: name,
-    content: data,
-    thumbnail: thumb
-  });
-};
-
-arrayBufferToBase64 = function (buffer) {
-  var binary, bytes, i, j, len, ref;
-  binary = '';
-  bytes = new Uint8Array(buffer);
-  len = bytes.byteLength;
-  for (i = j = 0, ref = len - 1; j <= ref; i = j += 1) {
-    binary += String.fromCharCode(bytes[i]);
-  }
-  return window.btoa(binary);
-};
-
 loadFile = function (file, callback) {
   var fr;
   switch (file.type) {
@@ -1060,7 +1021,7 @@ this.System = {
         extensions = options.extensions || null;
       }
       input = document.createElement("input");
-      if (options.multiple) {
+      if (options.multiple || Array.isArray(options)) {
         input.multiple = true;
       }
       input.type = "file";

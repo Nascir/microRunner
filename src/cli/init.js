@@ -43,7 +43,7 @@ async function init() {
 
   PROJECT_DIRS.forEach(dir => fs.mkdirSync(path.join(cwd, dir), { recursive: true }));
 
-  const templatePath = path.join(PROJECT_ROOT, 'static', 'template');
+  const templatePath = path.join(PROJECT_ROOT, 'src', 'templates');
   if (fs.existsSync(path.join(templatePath, 'icon.png'))) {
     fs.copyFileSync(path.join(templatePath, 'icon.png'), path.join(cwd, 'sprites', 'icon.png'));
   }

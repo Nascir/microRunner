@@ -35,18 +35,22 @@ this.AssetManager = class AssetManager {
   }
 
   loadFont(font) {
-    var err, file, name, split;
+    var err, file, fontFace, loader, name, split;
     if (typeof font !== "string") {
       return;
     }
     file = font.replace(/\//g, "-");
     split = file.split("-");
     name = split[split.length - 1];
+    loader = {
+      ready: 0
+    };
     try {
-      font = new FontFace(name, `url(/api/assets/${this.runtime.projectName}/${file}.ttf)`);
-      return font.load().then(() => {
-        document.fonts.add(font);
+      fontFace = new FontFace(name, `url(/api/assets/${this.runtime.projectName}/${file}.ttf)`);
+      fontFace.load().then(() => {
+        document.fonts.add(fontFace);
         this.loadedFonts.add(name);
+        loader.ready = 1;
         this.runtime?.listener?.log(`Font loaded: ${name}`);
       }).catch((err) => {
         if (this.runtime?.listener?.reportWarning) {
@@ -59,6 +63,7 @@ this.AssetManager = class AssetManager {
             type: 'font_load_error'
           });
         }
+        loader.ready = 1;
       });
     } catch (error) {
       err = error;
@@ -68,7 +73,9 @@ this.AssetManager = class AssetManager {
           type: 'font_load_error'
         });
       }
+      loader.ready = 1;
     }
+    return loader;
   }
 
   loadModel(path, scene, callback) {

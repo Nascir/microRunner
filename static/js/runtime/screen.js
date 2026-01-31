@@ -514,7 +514,7 @@ this.Screen = class Screen {
     return this.updateScreenTransform();
   }
 
-  setScale(scale_x, scale_y) {
+  setScale(scale_x, scale_y = scale_x) {
     this.scale_x = scale_x;
     this.scale_y = scale_y;
     if (!isFinite(this.scale_x) || this.scale_x === 0) {
@@ -553,7 +553,7 @@ this.Screen = class Screen {
     this.object_rotation = object_rotation;
   }
 
-  setDrawScale(object_scale_x, object_scale_y = this.object_scale_x) {
+  setDrawScale(object_scale_x, object_scale_y = object_scale_x) {
     this.object_scale_x = object_scale_x;
     this.object_scale_y = object_scale_y;
   }
@@ -678,11 +678,11 @@ this.Screen = class Screen {
 
   drawPolyline(args) {
     var i, j, len, ref, transform;
-    if (args.length > 0 && args.length % 2 === 1 && typeof args[args.length - 1] === "string") {
+    if (args.length > 0 && args.length % 2 === 1) {
       this.setColor(args[args.length - 1]);
     }
     if (Array.isArray(args[0])) {
-      if ((args[1] != null) && typeof args[1] === "string") {
+      if ((args[1] != null)) {
         this.setColor(args[1]);
       }
       args = args[0];
@@ -707,11 +707,11 @@ this.Screen = class Screen {
 
   drawPolygon(args) {
     var i, j, len, ref, transform;
-    if (args.length > 0 && args.length % 2 === 1 && typeof args[args.length - 1] === "string") {
+    if (args.length > 0 && args.length % 2 === 1) {
       this.setColor(args[args.length - 1]);
     }
     if (Array.isArray(args[0])) {
-      if ((args[1] != null) && typeof args[1] === "string") {
+      if ((args[1] != null)) {
         this.setColor(args[1]);
       }
       args = args[0];
@@ -737,11 +737,11 @@ this.Screen = class Screen {
 
   fillPolygon(args) {
     var i, j, len, ref, transform;
-    if (args.length > 0 && args.length % 2 === 1 && typeof args[args.length - 1] === "string") {
+    if (args.length > 0 && args.length % 2 === 1) {
       this.setColor(args[args.length - 1]);
     }
     if (Array.isArray(args[0])) {
-      if ((args[1] != null) && typeof args[1] === "string") {
+      if ((args[1] != null)) {
         this.setColor(args[1]);
       }
       args = args[0];

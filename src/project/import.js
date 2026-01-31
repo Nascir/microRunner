@@ -77,7 +77,13 @@ async function importProject(zipPath, options = {}) {
   const projectJson = JSON.parse(projectJsonEntry.getData().toString('utf-8'));
   let warning = null;
   if (projectJson.language && projectJson.language.startsWith('microscript_v1')) {
-    warning = 'This project uses microScript v1, which is not fully supported by microRunner. The game may not work correctly.';
+    warning = `
+┌─────────────────────────────────────────────────────────────┐
+│  ⚠️  WARNING: microScript v1 detected                       │
+│                                                             │
+│  This project uses microScript v1, which is not fully       │
+│  supported by microRunner. The game may not work correctly. │
+└─────────────────────────────────────────────────────────────┘`;
   }
 
   let projectPath;
@@ -149,37 +155,7 @@ async function importProject(zipPath, options = {}) {
   };
 }
 
-async function previewProject(zipPath) {
-  if (!fs.existsSync(zipPath)) {
-    throw new Error('Uploaded file not found');
-  }
-
-  const zip = new AdmZip(zipPath);
-  const entries = zip.getEntries();
-
-  const projectJsonEntry = entries.find(e => e.entryName === 'project.json');
-  if (!projectJsonEntry) {
-    throw new Error('Invalid archive: missing project.json');
-  }
-
-  const projectJson = JSON.parse(projectJsonEntry.getData().toString('utf-8'));
-
-  const tomlConfig = config.fromProjectJson(projectJson);
-
-  return {
-    name: projectJson.title,
-    slug: tomlConfig.meta.slug,
-    orientation: projectJson.orientation || 'any',
-    aspect: projectJson.aspect || 'free',
-    spriteDirection: tomlConfig.sprites?.direction || 'vertical',
-    warning: projectJson.language && projectJson.language.startsWith('microscript_v1')
-      ? 'This project uses microScript v1, which is not fully supported by microRunner.'
-      : null,
-  };
-}
-
 module.exports = {
   importProject,
-  previewProject,
   safeExtractZip,
 };

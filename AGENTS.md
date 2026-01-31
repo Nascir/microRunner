@@ -1,28 +1,25 @@
 # AGENTS.md - microRunner
 
-## Build & Test Commands
+Local microScript development environment - a standalone runtime for microStudio projects.
+
+## Commands
 
 ```bash
-npm start          # Production server (port 3000)
-npm run dev        # Development server with auto-restart
-npm run lint       # Run ESLint on all JS files
+# Server
+npm start                    # Production server (port 3000)
+npm run dev                  # Development server with auto-restart (nodemon)
 
-# Lint specific file
-npx eslint src/cli/index.js
+# Linting & Quality
+npm run lint                 # Run ESLint on all src/ files
+npx eslint src/cli/index.js  # Lint specific file
+npx eslint src/ --fix        # Auto-fix linting issues
 
-# Auto-fix linting issues
-npx eslint . --ext .js --fix
+# Testing
+node microrunner.js dev/project-test/  # Run with test project
+# Open http://localhost:3000 in browser and check console
 ```
 
-## Testing
-
-**Manual testing only** - Load microScript files in browser, check console.
-
-**Test location:** `/Users/slawomir/Developer/Testing/ms/`
-- `main.ms` - Comprehensive microScript v2 compatibility tests
-- `this-test.ms` - Tests for `this` behavior
-
-## Code Style (ESLint Enforced)
+## Code Style (ESLint)
 
 | Rule | Value |
 |------|-------|
@@ -30,30 +27,40 @@ npx eslint . --ext .js --fix
 | Quotes | Single (`'...'`) |
 | Semicolons | Always required |
 | Line endings | LF (Unix) |
-| Trailing commas | Multiline only |
+| Trailing spaces | Forbidden |
+| EOF newline | Required |
+| Unused vars | Warn |
+
+**Ignored:** `node_modules/`, `static/js/runtime/`, `static/js/languages/`, `static/lib/`
 
 ## Naming Conventions
 
 | Type | Convention | Example |
 |------|------------|---------|
 | Variables | camelCase | `projectPath` |
-| Constants | SCREAMING_SNAKE_CASE | `MTIME_CACHE_TTL` |
+| Constants | SCREAM_CASE | `MTIME_CACHE_TTL` |
 | Functions | camelCase | `getProjectFiles()` |
 | Classes | PascalCase | `Runtime`, `Player` |
 | Files | kebab-case | `backup.js` |
 
 ## Imports & Module Structure
 
+**Backend (Node.js) - CommonJS:**
 ```javascript
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
 
 function helperFunction() { /* ... */ }
-
 async function mainFunction() { /* ... */ }
-
 module.exports = { mainFunction, helperFunction };
+```
+
+**Frontend (Browser) - IIFE/Global:**
+```javascript
+this.Runtime = class Runtime {
+  constructor() { /* ... */ }
+};
 ```
 
 ## Error Handling
@@ -64,30 +71,33 @@ async function getProjectConfig(projectPath) {
     const config = await configModule.read(projectPath);
     return config;
   } catch (err) {
-    console.error(`[Config] Error reading ${projectPath}:`, err);
+    console.error('[Config] Error reading ' + projectPath + ':', err);
     throw err;
   }
 }
 ```
 
+**Rules:**
 - Use `try/catch` for async operations
 - Log errors with context: `console.error('[Module] Error:', err)`
 - No empty catch blocks
-- Always handle promise rejections: `.catch(err => console.error(...))`
+- Handle promise rejections: `.catch(err => console.error(...))`
+- Use `console.warn()` for warnings, `console.error()` for errors
 
 ## Project Structure
 
 ```
-src/
-├── cli/          # CLI commands (index.js, start.js, import.js)
-└── project/      # Backend modules (config.js, backup.js, export.js)
-
-static/
-├── js/
-│   ├── runtime/       # Game runtime (runtime.js, screen.js, microvm.js)
-│   └── languages/     # microScript v2 (parser, tokenizer, compiler, processor)
-├── css/               # Stylesheets
-└── *.html             # HTML pages
+microrunner/
+├── server.js                    # Express server entry point
+├── microrunner.js               # CLI entry point
+├── src/                         # Backend source (linted)
+│   ├── cli/                     # CLI commands
+│   └── project/                 # Project management modules
+├── static/
+│   ├── js/runtime/              # Game runtime (NOT linted)
+│   ├── js/languages/            # microScript compiler (NOT linted)
+│   └── css/
+└── src/templates/               # Project templates (not publicly served)
 ```
 
 ## Critical Patterns
@@ -118,18 +128,18 @@ function broadcastToProject(project, message) {
 }
 ```
 
-### Terminal Clear
+### Adding Runtime APIs (runtime.js)
+Add new APIs in `startReady()` method:
 ```javascript
-process.stdout.write('\x1Bc');
-console.log('🎮 microRunner is launching...');
+this.vm.context.global.screen = this.screen.getInterface();
+this.vm.context.global.keyboard = this.keyboard.keyboard;
+this.vm.context.global.touch = this.touch;
+this.vm.context.global.mouse = this.mouse;
+this.vm.context.global.system = System;
+this.vm.context.global.storage = new Storage();
+this.vm.context.global.audio = this.audio.getInterface();
+this.vm.context.global.asset_manager = this.asset_manager.getInterface();
 ```
-
-## Hot Reload Flow
-
-1. File changes in `ms/` directory
-2. `chokidar` detects change → broadcasts `{ type: 'update', file, code }`
-3. Client receives via WebSocket → `runtime.updateSource(file, code)`
-4. VM re-compiles, game continues without restart
 
 ## Common Tasks
 
@@ -137,26 +147,17 @@ console.log('🎮 microRunner is launching...');
 |------|------|-------|
 | New CLI command | `src/cli/index.js` | Add to switch, create handler |
 | New API endpoint | `server.js` | Use `validatePath()` |
-| New runtime API | `static/js/runtime/runtime.js` | Add to `global` in `startReady()` |
+| New runtime API | `runtime.js` | Add to `global` in `startReady()` |
 | File patterns | `src/constants.js` | Update regex patterns |
-| microScript compiler | `static/js/languages/microscript/v2/` | parser.js, compiler.js, processor.js |
-
-## Codebase Overview
-
-- **Server**: Express + WebSocket (ws) for real-time updates
-- **Runtime**: Custom microScript v2 VM in `static/js/runtime/`
-- **Hot Reload**: File watcher triggers recompilation via WebSocket
-- **Assets**: Images, sounds, maps served via API endpoints
-- **Project Config**: `project.toml` with sprites, settings, metadata
+| microScript compiler | `static/js/languages/microscript/v2/` | parser, compiler, processor |
 
 ## microScript v2 Compatibility
 
-The compiler is derived from microStudio and supports:
-- Conditionals as expressions: `x = if cond then "a" else "b" end`
-- All standard operations, loops, functions, classes
-- The `if` construct uses stack-based VM - last statement value is returned
+Reference files in `dev/microstudio-master/`:
+- `static/js/runtime/` - Original microStudio runtime
+- `static/js/languages/microscript/v2/` - Original compiler
 
-When modifying the compiler:
-- Test changes with `main.ms` test suite
-- Verify `if` expression behavior still works
-- Check both statement and expression forms of `if`
+**Rules:**
+- All microScript syntax must match microStudio exactly
+- Verify changes with `dev/project-test/` project
+- Check `if` expression behavior (conditionals as expressions)

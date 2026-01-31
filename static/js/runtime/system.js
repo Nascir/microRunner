@@ -37,8 +37,8 @@ this.System = {
   update_rate: 60,
 
   file: {
-    loaded: null,
-    dropped: null,
+    loaded: [],
+    dropped: [],
     load: function(types, callback) {
       var input = document.createElement("input");
       input.type = "file";
@@ -74,7 +74,33 @@ this.System = {
       input.click();
     },
     save: function(obj, name, format, quality) {
+      var a, canvas, dataUrl, ext, mimeType;
+      ext = format || "png";
+      mimeType = {
+        png: "image/png",
+        jpg: "image/jpeg",
+        jpeg: "image/jpeg",
+        gif: "image/gif",
+        webp: "image/webp"
+      }[ext.toLowerCase()] || "image/png";
+      if (typeof obj === "object" && obj !== null) {
+        if (obj.class && obj.class.classname === "Image") {
+          canvas = obj.canvas || obj.image;
+          if (canvas) {
+            dataUrl = canvas.toDataURL(mimeType, quality);
+            a = document.createElement("a");
+            a.style = "display: none";
+            a.href = dataUrl;
+            a.download = name || "image." + ext;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            return 1;
+          }
+        }
+      }
       console.warn("system.file.save is not fully supported in external mode");
+      return 0;
     }
   },
 

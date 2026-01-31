@@ -19,7 +19,7 @@ async function importCommand() {
     const result = await importProject(zipPath, { cwd: process.cwd() });
 
     if (result.warning) {
-      console.warn('\n  ' + result.warning + '\n');
+      console.warn(result.warning);
     }
 
     console.log('\nProject "' + result.name + '" imported successfully!');
