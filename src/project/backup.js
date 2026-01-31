@@ -2,8 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const AdmZip = require('adm-zip');
 const config = require('./config');
-const { collect } = require('./files');
-const { VERSION } = require('../constants');
+const { PROJECT_DIRS, VERSION } = require('../constants');
 
 function formatDate(timestamp) {
   const date = new Date(timestamp);
@@ -65,8 +64,6 @@ async function createBackup(project, options = {}) {
     fs.mkdirSync(archiveDir, { recursive: true });
   }
 
-  const files = collect(projectPath);
-
   const zip = new AdmZip();
 
   const tomlPath = path.join(projectPath, 'project.toml');
@@ -77,26 +74,12 @@ async function createBackup(project, options = {}) {
     zip.addFile('project.json', Buffer.from(JSON.stringify(projectJson, null, 2)));
   }
 
-  for (const file of files.sources) {
-    zip.addLocalFile(file.fullPath, 'ms', file.name);
-  }
-  for (const file of files.sprites) {
-    zip.addLocalFile(file.fullPath, 'sprites', file.name);
-  }
-  for (const file of files.maps) {
-    zip.addLocalFile(file.fullPath, 'maps', file.name);
-  }
-  for (const file of files.sounds) {
-    zip.addLocalFile(file.fullPath, 'sounds', file.name);
-  }
-  for (const file of files.music) {
-    zip.addLocalFile(file.fullPath, 'music', file.name);
-  }
-  for (const file of files.assets) {
-    zip.addLocalFile(file.fullPath, 'assets', file.name);
-  }
-  for (const file of files.docs) {
-    zip.addLocalFile(file.fullPath, 'doc', file.name);
+  for (const dir of PROJECT_DIRS) {
+    const fullPath = path.join(projectPath, dir);
+    if (fs.existsSync(fullPath)) {
+      zip.addLocalFolder(fullPath, dir);
+    }
+    zip.addFile(dir + '/', Buffer.from(''));
   }
 
   zip.writeZip(backupPath);

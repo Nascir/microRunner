@@ -12,8 +12,17 @@ async function start(chromeFlag = false) {
   const tomlPath = path.join(cwd, 'project.toml');
 
   if (!fs.existsSync(tomlPath)) {
-    console.error(`Error: project.toml not found in ${cwd}`);
-    console.error('Run "microrunner init" first to initialize a project.\n');
+    const entries = fs.readdirSync(cwd);
+    const nonHiddenEntries = entries.filter((e) => !e.startsWith('.'));
+
+    console.error('\n⚠️  Cannot start project');
+
+    if (nonHiddenEntries.length === 0) {
+      console.error('💡  Run "microrunner init" first to initialize a project.\n');
+    } else {
+      console.error('💡  This folder is not a microRunner project. Check that you\'re in the correct folder.\n');
+    }
+
     process.exit(1);
   }
 

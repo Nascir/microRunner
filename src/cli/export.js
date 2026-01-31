@@ -12,7 +12,8 @@ async function exportCommand() {
 
   try {
     const result = await createExport(cwd);
-    console.log(`\nExport created: ${result.filePath}\n`);
+    console.log('\n📦  Export created!');
+    console.log('📁  ' + result.filePath + '\n\n');
   } catch (e) {
     console.error(`\nError: ${e.message}\n`);
     process.exit(1);

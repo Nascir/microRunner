@@ -1,4 +1,5 @@
 init = function()
+  print("Hello, World!")
 end
 
 update = function()

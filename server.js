@@ -58,12 +58,12 @@ const projectSpriteWatchers = new Map();
 const projectWsClients = new Map();
 let sessionStarted = false;
 
-function printSessionSeparator() {
+function printSessionSeparator(slug) {
   const line = '─'.repeat(50);
   const now = new Date().toISOString().replace('T', ' ').slice(0, 19);
   console.log('\n' + line);
   console.log(`🚀 Session started: ${now}`);
-  console.log(`🟢 microRunner running at http://localhost:${PORT}`);
+  console.log(`🟢 Project at http://localhost:${PORT}/${slug}`);
   console.log('⏹️  Press Ctrl+C to stop the server.');
   console.log(line + '\n');
 }
@@ -324,7 +324,7 @@ wss.on('connection', (ws, req) => {
 
     if (!sessionStarted) {
       sessionStarted = true;
-      printSessionSeparator();
+      printSessionSeparator(project);
     }
   }
 
@@ -338,7 +338,7 @@ wss.on('connection', (ws, req) => {
         console.error(msg.data);
       } else if (msg.type === 'restart') {
         process.stdout.write('\x1Bc');
-        printSessionSeparator();
+        printSessionSeparator(ws.project);
       }
     } catch {}
   });

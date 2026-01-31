@@ -23,32 +23,53 @@ async function init() {
   const folderName = path.basename(cwd);
 
   const entries = fs.readdirSync(cwd);
-  const nonHiddenEntries = entries.filter(e => !e.startsWith('.'));
+  const nonHiddenEntries = entries.filter((e) => !e.startsWith('.'));
 
   if (nonHiddenEntries.length > 0) {
-    console.error('\nError: The current folder is not empty.');
-    console.error('Found ' + nonHiddenEntries.length + ' file(s):');
-    nonHiddenEntries.forEach(e => console.error('  - ' + e));
-    console.error('\nRun "microrunner init" only in empty folders.\n');
+    console.error('\n⚠️  Cannot initialize project');
+    console.error('\n📂 Found ' + nonHiddenEntries.length + ' item(s):');
+    nonHiddenEntries.forEach((e) => console.error('  • ' + e));
+    console.error('\n💡 Run "microrunner init" only in empty folders.');
+    console.error('\nYou can either:');
+    console.error(
+      '  1. Create a new empty folder and run "microrunner init" there',
+    );
+    console.error('  2. Remove existing files from this folder first\n');
     process.exit(1);
   }
 
-  console.log('\nCreating project in ' + cwd + '\n');
+  console.log('');
 
-  const name = await askQuestion('Project name (' + folderName + '): ') || folderName;
-  const slugInput = await askQuestion('Slug (URL-friendly name, e.g., my-game): ');
-  const slug = slugInput || folderName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+  const name =
+    (await askQuestion('Project name (' + folderName + '): ')) || folderName;
+  const slugInput = await askQuestion(
+    'Slug (URL-friendly name, e.g., my-game): ',
+  );
+  const slug =
+    slugInput ||
+    folderName
+      .toLowerCase()
+      .replace(/\s+/g, '-')
+      .replace(/[^a-z0-9-]/g, '');
 
-  console.log('\nCreating project "' + name + '" with slug "' + slug + '"...\n');
+  console.log('\n🎮  Creating project "' + name + '" (slug: ' + slug + ')...\n');
 
-  PROJECT_DIRS.forEach(dir => fs.mkdirSync(path.join(cwd, dir), { recursive: true }));
+  PROJECT_DIRS.forEach((dir) =>
+    fs.mkdirSync(path.join(cwd, dir), { recursive: true }),
+  );
 
   const templatePath = path.join(PROJECT_ROOT, 'src', 'templates');
   if (fs.existsSync(path.join(templatePath, 'icon.png'))) {
-    fs.copyFileSync(path.join(templatePath, 'icon.png'), path.join(cwd, 'sprites', 'icon.png'));
+    fs.copyFileSync(
+      path.join(templatePath, 'icon.png'),
+      path.join(cwd, 'sprites', 'icon.png'),
+    );
   }
   if (fs.existsSync(path.join(templatePath, 'main.ms'))) {
-    fs.copyFileSync(path.join(templatePath, 'main.ms'), path.join(cwd, 'ms', 'main.ms'));
+    fs.copyFileSync(
+      path.join(templatePath, 'main.ms'),
+      path.join(cwd, 'ms', 'main.ms'),
+    );
   }
 
   const projectConfig = config.createConfig(name, slug);
@@ -56,8 +77,9 @@ async function init() {
 
   await config.syncSprites(cwd);
 
-  console.log('Project initialized successfully!\n');
-  console.log('Run "microrunner start" to start the server.\n');
+  console.log('✅  Project initialized successfully!');
+  console.log('📁  Location: ' + cwd + '\n');
+  console.log('💡  Next: Run "microrunner start" to start the development server\n');
 }
 
 module.exports = { init };

@@ -22,11 +22,11 @@ async function importCommand() {
       console.warn(result.warning);
     }
 
-    console.log('\nProject "' + result.name + '" imported successfully!');
-    console.log('Location: ' + result.path);
-    console.log('\nTo get started:');
-    console.log('  cd ' + path.basename(result.path));
-    console.log('  microrunner start\n');
+    console.log('✅  Project "' + result.name + '" imported successfully!');
+    console.log('📁  Location: ' + result.path + '\n');
+    console.log('💡  Next steps:');
+    console.log('   • cd ' + path.basename(result.path));
+    console.log('   • microrunner start\n');
   } catch (e) {
     console.error('\nError: ' + e.message + '\n');
     process.exit(1);

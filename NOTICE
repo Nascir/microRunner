@@ -1,0 +1,82 @@
+microrunner - NOTICE
+====================
+
+Author: Nascir (https://github.com/Nascir/microRunner)
+
+This project contains third-party open source software components.
+Full license texts are available in the licenses/ directory.
+
+A. Components (microStudio)
+---------------------------
+
+- microStudio runtime and compiler components
+  Copyright (c) 2021 Gilles Pommereuil (pmgl)
+  License: MIT
+  Source: https://github.com/pmgl/microstudio
+
+B. Dependencies (npm packages)
+------------------------------
+
+The following npm packages are used under the MIT License:
+
+- adm-zip (MIT)
+- chokidar (MIT)
+- commander (MIT)
+- express (MIT)
+- express-fileupload (MIT)
+- open (MIT)
+- smol-toml (MIT)
+- ws (MIT)
+- @fontsource/inter (SIL Open Font License 1.1)
+- eslint (MIT)
+- hack-font (MIT + Bitstream Vera + public domain)
+- nodemon (MIT)
+
+C. Assets (fonts)
+-----------------
+
+- Inter font - Copyright (c) 2016 The Inter Project Authors
+  License: SIL Open Font License 1.1
+  Source: https://github.com/rsms/inter
+
+- Hack font - Copyright (c) 2018 Source Foundry Authors
+  License: MIT + public domain (DejaVu) + Bitstream Vera
+  Source: https://source-foundry.org/hack/
+
+- BitCell font - Copyright (c) memesbruh03
+  License: Free font
+  Source: https://github.com/memesbruh03
+
+D. Assets (icons)
+-----------------
+
+- Font Awesome Free - Copyright (c) 2025 Fonticons, Inc.
+  License: SIL Open Font License 1.1 (icons) + CC BY 4.0 (icons) + MIT (code)
+  Source: https://fontawesome.com
+
+E. Acknowledgments
+------------------
+
+This project uses the following open source projects.
+Thank you to all contributors and maintainers!
+
+- microStudio by Gilles Pommereuil (pmgl)
+- Inter font by Rasmus Andersson (rsms)
+- Hack font by Source Foundry
+- BitCell font by memesbruh03
+- Font Awesome by Fonticons, Inc.
+- Node.js and all npm package authors
+
+F. License References
+---------------------
+
+Full license texts are available in the licenses/ directory:
+
+- licenses/microstudio.txt - MIT License (microStudio)
+- licenses/inter.txt - SIL Open Font License 1.1 (Inter font)
+- licenses/hack.txt - MIT + Bitstream Vera + public domain (Hack font)
+- licenses/bitcell.txt - Free font (BitCell)
+- licenses/font-awesome.txt - SIL OFL 1.1 + CC BY 4.0 + MIT (Font Awesome)
+
+The MIT License applies to the microrunner project itself.
+See the LICENSE file for details.
