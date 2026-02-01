@@ -15,15 +15,13 @@ function showHelp() {
 
 Commands:
   init        Initialize a new project in current folder
-  start       Scan sprites and start the server
-  import      Import a project from microStudio ZIP file
-  export      Export project to microStudio compatible ZIP
-  backup      Create a backup of the project
+  start       Scan sprites, start server and open browser
+  backup      Create project backup
+  import      Create project from microStudio ZIP file
+  export      Export project to microStudio ZIP file
   version     Show version
 
 Examples:
-  mkdir my-awesome-game
-  cd my-awesome-game
   microrunner init
   microrunner start
 `);
