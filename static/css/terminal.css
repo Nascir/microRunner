@@ -1,0 +1,116 @@
+@import url("/css/fonts.css");
+
+#terminal {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  overflow: hidden;
+}
+
+#terminal-view {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--color-terminalBg);
+  font-family: "Hack", monospace;
+  font-size: 14px;
+  overflow: auto;
+}
+
+#terminal-lines {
+  padding: 5px;
+  color: var(--color-terminalText);
+  user-select: text;
+}
+
+#terminal-lines div {
+  padding: 2px 4px;
+  white-space: pre-wrap;
+  line-height: 20px;
+  text-align: left;
+}
+
+#terminal-lines div.error {
+  color: var(--color-terminalError);
+}
+
+#terminal-lines div.system {
+  color: var(--color-terminalSystem);
+}
+
+#terminal-lines div.warning {
+  color: var(--color-warning);
+}
+
+#terminal-lines div.console-log i,
+#terminal-lines div.console-warn i,
+#terminal-lines div.console-error i,
+#terminal-lines div.console-info i,
+#terminal-lines div.console-trace i,
+#terminal-lines div.console-table i,
+#terminal-lines div.console-time i {
+  margin-right: 6px;
+  width: 16px;
+  text-align: center;
+}
+
+#terminal-lines div.console-log {
+  color: var(--color-consoleLog);
+}
+
+#terminal-lines div.console-warn {
+  color: var(--color-consoleWarn);
+}
+
+#terminal-lines div.console-error {
+  color: var(--color-consoleError);
+}
+
+#terminal-lines div.console-info {
+  color: var(--color-consoleInfo);
+}
+
+#terminal-lines div.console-trace {
+  color: var(--color-consoleTrace);
+}
+
+#terminal-lines div.console-table {
+  color: var(--color-consoleTable);
+}
+
+#terminal-lines div.console-time {
+  color: var(--color-consoleTime);
+}
+
+#terminal-lines .table-output {
+  font-family: monospace;
+  white-space: pre;
+  font-size: 12px;
+  line-height: 16px;
+  padding: 4px 8px;
+  margin: 2px 0;
+}
+
+#terminal-lines .stack-trace {
+  font-family: monospace;
+  font-size: 11px;
+  color: var(--color-textMuted);
+  white-space: pre;
+  padding: 4px 8px;
+  margin: 2px 0;
+}
+
+#terminal-notification {
+  display: none;
+  color: var(--color-terminalSystem);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+#terminal-notification.show {
+  display: block;
+}

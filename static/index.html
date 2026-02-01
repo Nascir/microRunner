@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>microRunner</title>
+    <link rel="stylesheet" href="/css/style.css" />
+    <link rel="stylesheet" href="/lib/font-awesome/css/all.min.css" />
+</head>
+<body>
+    <main class="container home-container">
+        <header class="hero">
+            <h1>micro<span class="accent">Runner</span></h1>
+            <p class="tagline">Local microScript development environment</p>
+            <div class="version-pill">v1.0-beta-10</div>
+        </header>
+
+        <section class="terminal-section">
+            <div class="terminal-window">
+                <div class="terminal-header">
+                    <span class="terminal-dots">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </span>
+                    <span class="terminal-title">Terminal</span>
+                </div>
+                <div class="terminal-body">
+                    <div class="terminal-line"><span class="prompt">$</span> microrunner init</div>
+                    <div class="terminal-line"><span class="prompt">$</span> microrunner start</div>
+                    <div class="terminal-line"><span class="prompt">$</span> microrunner import &lt;file.zip&gt;</div>
+                    <div class="terminal-line"><span class="prompt">$</span> microrunner export</div>
+                    <div class="terminal-line"><span class="prompt">$</span> microrunner backup</div>
+                    <div class="terminal-line"><span class="prompt">$</span> microrunner version</div>
+                </div>
+            </div>
+            <p class="terminal-hint">Enter commands in your project folder</p>
+        </section>
+
+        <section class="commands-grid">
+            <div class="command-card">
+                <code>init</code>
+                <span>Initialize new project in empty folder</span>
+            </div>
+            <div class="command-card">
+                <code>start</code>
+                <span>Scan sprites and start development server</span>
+            </div>
+            <div class="command-card">
+                <code>import</code>
+                <span>Import project from microStudio ZIP</span>
+            </div>
+            <div class="command-card">
+                <code>export</code>
+                <span>Export to microStudio compatible ZIP</span>
+            </div>
+            <div class="command-card">
+                <code>backup</code>
+                <span>Create timestamped project backup</span>
+            </div>
+            <div class="command-card">
+                <code>version</code>
+                <span>Show installed version</span>
+            </div>
+        </section>
+
+        <section class="powered-by">
+            <span>Powered by</span>
+            <a href="https://github.com/pmgl/microstudio" target="_blank" title="microStudio on GitHub">
+                <i class="fab fa-github"></i> microStudio
+            </a>
+        </section>
+
+        <footer class="footer">
+            <a href="https://github.com/Nascir/microRunner" target="_blank" title="microRunner on GitHub">
+                <i class="fab fa-github"></i> microRunner
+            </a>
+        </footer>
+    </main>
+</body>
+</html>

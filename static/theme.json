@@ -1,0 +1,31 @@
+{
+  "colors": {
+    "accent": "#E47E4D",
+    "accentDim": "rgba(228, 126, 77, 0.15)",
+    "accentBorder": "rgba(228, 126, 77, 0.3)",
+    "background": "#1a1b26",
+    "cardBg": "#16161e",
+    "darkBg": "#0f0f14",
+    "border": "#101014",
+    "textPrimary": "#a9b1d6",
+    "textSecondary": "#787c99",
+    "textMuted": "#565f89",
+    "textDim": "#666",
+    "portrait": "#E47E4D",
+    "landscape": "#E47E4D",
+    "square": "#E47E4D",
+    "terminalBg": "#16161e",
+    "terminalText": "#9ece6a",
+    "terminalError": "#f7768e",
+    "terminalSystem": "#7aa2f7",
+    "warning": "#e0af68",
+    "danger": "#ff6b6b",
+    "consoleLog": "#7aa2f7",
+    "consoleWarn": "#e0af68",
+    "consoleError": "#f7768e",
+    "consoleInfo": "#bb9af7",
+    "consoleTrace": "#8b949e",
+    "consoleTable": "#79c0ff",
+    "consoleTime": "#d2a8ff"
+  }
+}

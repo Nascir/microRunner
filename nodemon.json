@@ -1,0 +1,8 @@
+{
+  "ignore": [
+    "backup/**",
+    "export/**",
+    "temp_*"
+  ],
+  "delay": 500
+}

@@ -1,0 +1,1285 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>microRunner - Loading...</title>
+  <link rel="stylesheet" href="/css/fonts.css">
+  <link rel="stylesheet" href="/css/terminal.css">
+  <link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      padding: 0;
+      background: var(--color-darkBg);
+      color: var(--color-textPrimary);
+      font-family: 'Inter', sans-serif;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    .container {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 20px;
+      background: var(--color-cardBg);
+      border-bottom: 1px solid var(--color-border);
+      position: relative;
+    }
+
+    .header h1 {
+      margin: 0;
+      font-size: 1.2rem;
+      color: var(--color-accent);
+    }
+
+    .control-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+
+    .header h1 {
+      margin: 0;
+      font-size: 1.2rem;
+      color: var(--color-accent);
+    }
+
+    .header a {
+      color: var(--color-textSecondary);
+      text-decoration: none;
+      font-size: 0.9rem;
+    }
+
+    .header a:hover {
+      color: var(--color-accent);
+    }
+
+    .control-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .control-btn {
+      width: 32px;
+      height: 32px;
+      border: none;
+      border-radius: 4px;
+      background: var(--color-darkBg);
+      color: var(--color-textSecondary);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      transition: all 0.2s;
+    }
+
+    .control-btn:hover {
+      background: #2a2a4e;
+      color: var(--color-accent);
+    }
+
+    .control-btn:active {
+      transform: scale(0.95);
+    }
+
+    .status-indicator {
+      margin-left: 8px;
+      padding: 4px 10px;
+      border-radius: 3px;
+      font-size: 0.75rem;
+      font-weight: bold;
+      letter-spacing: 0.5px;
+    }
+
+    .status-running {
+      background: var(--color-accentDim);
+      color: var(--color-accent);
+    }
+
+    .status-paused {
+      background: rgba(255, 200, 50, 0.15);
+      color: #ffc832;
+    }
+
+    .fps-icon {
+      cursor: pointer;
+      color: var(--color-textMuted);
+      font-size: 0.9rem;
+      transition: all 0.2s ease;
+    }
+
+    .fps-icon:not(.active):hover {
+      color: var(--color-accent);
+    }
+
+    .fps-icon.active {
+      color: var(--color-accent);
+    }
+
+    .fps-icon.turning-off,
+    .fps-icon.turning-off:hover {
+      color: var(--color-textMuted) !important;
+    }
+
+    .fps-value-container {
+      display: inline-flex;
+      min-width: 50px;
+    }
+
+    .fps-value {
+      min-width: 24px;
+      text-align: right;
+      font-family: monospace;
+      font-weight: bold;
+      color: var(--color-textMuted);
+    }
+
+    .fps-label {
+      color: var(--color-textMuted);
+      margin-left: 4px;
+    }
+
+    .fps-icon.active + .fps-value-container .fps-value,
+    .fps-icon.active + .fps-value-container .fps-label {
+      color: var(--color-accent);
+    }
+
+    .main-content {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    .game-wrapper {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #000;
+      position: relative;
+      overflow: hidden;
+      padding: 20px;
+    }
+
+    .game-wrapper.full-width {
+      justify-content: stretch;
+    }
+
+    .game-wrapper.full-width .display-frame {
+      flex: 1;
+      max-width: 100%;
+      max-height: 100%;
+    }
+
+    .display-frame {
+      border: 1px solid var(--color-accentBorder);
+      border-radius: 4px;
+      box-shadow:
+        inset 0 0 0 1px rgba(0, 0, 0, 0.3),
+        0 0 20px rgba(0, 0, 0, 0.5);
+      overflow: hidden;
+      max-width: 100%;
+      max-height: 100%;
+    }
+
+    #game-canvas {
+      display: block;
+      image-rendering: pixelated;
+      image-rendering: -moz-crisp-edges;
+      image-rendering: -webkit-optimize-contrast;
+    }
+
+    .terminal-pane {
+      width: 350px;
+      display: flex;
+      flex-direction: column;
+      border-left: 1px solid var(--color-border);
+      background: #0d1117;
+    }
+
+    .terminal-header {
+      padding: 10px 15px;
+      background: var(--color-darkBg);
+      border-bottom: 1px solid var(--color-border);
+      font-size: 0.9rem;
+      color: var(--color-accent);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    #terminal {
+      flex: 1;
+      overflow: hidden;
+      position: relative;
+    }
+
+    #terminal-view {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      overflow-y: auto;
+      padding: 5px;
+      font-family: monospace;
+      font-size: 14px;
+      color: var(--color-terminalText);
+    }
+
+    #terminal-lines div {
+      padding: 2px 4px;
+      white-space: pre-wrap;
+      line-height: 20px;
+      text-align: left;
+    }
+
+    #terminal-lines div.error {
+      color: var(--color-terminalError);
+    }
+
+    #terminal-lines div.system {
+      color: var(--color-terminalSystem);
+    }
+
+    #terminal-lines div.output {
+      color: var(--color-terminalText);
+      text-align: left;
+    }
+
+    .status-bar {
+      padding: 8px 20px;
+      background: var(--color-cardBg);
+      border-top: 1px solid var(--color-border);
+      font-size: 0.8rem;
+      color: var(--color-textMuted);
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .status-bar .connected {
+      color: var(--color-accent);
+    }
+
+    .status-bar .disconnected {
+      color: #ff6b6b;
+    }
+
+    .status-bar-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    #connection-status {
+      margin-right: 24px;
+    }
+
+    .welcome-message {
+      padding: 20px;
+      color: var(--color-textMuted);
+      text-align: center;
+      font-size: 0.9rem;
+    }
+
+    .terminal-pane.hidden {
+      width: 0;
+      min-width: 0;
+      flex: 0;
+      border: none;
+      overflow: hidden;
+    }
+
+    .terminal-btn {
+      width: 26px;
+      height: 26px;
+      border: none;
+      border-radius: 3px;
+      background: transparent;
+      color: var(--color-textMuted);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      transition: all 0.2s;
+    }
+
+    .terminal-btn:hover {
+      background: var(--color-accentDim);
+      color: var(--color-accent);
+    }
+
+    .terminal-btn:active {
+      transform: scale(0.95);
+    }
+
+    #terminal-notification.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .terminal-tab {
+      position: absolute;
+      right: 0;
+      top: 10px;
+      width: 30px;
+      height: 26px;
+      background: var(--color-darkBg);
+      border: 1px solid var(--color-border);
+      border-right: none;
+      border-radius: 4px 0 0 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--color-textMuted);
+      cursor: pointer;
+      z-index: 10;
+      transition: all 0.2s;
+    }
+
+    .terminal-tab:hover {
+      background: var(--color-accentDim);
+      color: var(--color-accent);
+    }
+
+    .terminal-tab.bottom {
+      right: 10px;
+      left: auto;
+      top: auto;
+      bottom: 10px;
+      border-radius: 4px 4px 0 0;
+      border: 1px solid var(--color-border);
+      border-bottom: none;
+    }
+
+    .main-content.bottom {
+      flex-direction: column;
+    }
+
+    .terminal-pane.bottom {
+      width: 100%;
+      height: 350px;
+      border-left: none;
+      border-top: 1px solid var(--color-border);
+    }
+
+    .terminal-pane.bottom.half {
+      height: 250px;
+    }
+
+    .terminal-pane.bottom.collapsed {
+      height: 150px;
+    }
+
+    .game-wrapper.bottom {
+      padding-bottom: 0;
+    }
+
+    .main-content.bottom .game-wrapper {
+      padding-bottom: 0;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <div class="header">
+      <h1 id="project-name">Loading...</h1>
+      <div class="control-bar">
+        <button id="btn-play" class="control-btn" title="Play" style="display:none">
+          <i class="fas fa-play"></i>
+        </button>
+        <button id="btn-pause" class="control-btn" title="Pause">
+          <i class="fas fa-pause"></i>
+        </button>
+        <button id="btn-step" class="control-btn" title="Step Forward" style="display:none">
+          <i class="fas fa-step-forward"></i>
+        </button>
+        <button id="btn-restart" class="control-btn" title="Restart">
+          <i class="fas fa-redo"></i>
+        </button>
+        <span id="execution-status" class="status-indicator status-running">RUNNING</span>
+      </div>
+    </div>
+    <div class="main-content">
+      <div class="game-wrapper">
+        <div class="display-frame">
+          <canvas id="game-canvas"></canvas>
+        </div>
+        <div class="terminal-tab" id="terminal-tab" style="display:none">
+          <i class="fas fa-terminal" title="Show Terminal"></i>
+        </div>
+      </div>
+      <div class="terminal-pane">
+        <div class="terminal-header">
+          <span>Terminal</span>
+          <div style="flex:1"></div>
+          <span id="terminal-notification"></span>
+          <button id="btn-terminal-copy" class="terminal-btn" title="Copy">
+            <i class="fas fa-copy"></i>
+          </button>
+          <button id="btn-terminal-clear" class="terminal-btn" title="Clear">
+            <i class="fas fa-trash-alt"></i>
+          </button>
+          <button id="btn-terminal-position" class="terminal-btn" title="Move to Bottom">
+            <i class="fas fa-chevron-down"></i>
+          </button>
+          <button id="btn-terminal-expand" class="terminal-btn" title="Expand to 350px" style="display:none">
+            <i class="fas fa-chevron-up"></i>
+          </button>
+          <button id="btn-terminal-collapse" class="terminal-btn" title="Collapse to 250px">
+            <i class="fas fa-chevron-down"></i>
+          </button>
+          <button id="btn-toggle-terminal" class="terminal-btn" title="Toggle Terminal">
+            <i class="fas fa-eye-slash"></i>
+          </button>
+        </div>
+        <div id="terminal">
+          <div id="terminal-view">
+            <div id="terminal-lines">
+              <div class="output">microScript 2.0</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="status-bar">
+      <div class="status-bar-left">
+        <span id="connection-status" class="disconnected">Connecting...</span>
+        <i id="fps-icon" class="fas fa-tachometer-alt fps-icon" title="Click for FPS"></i>
+        <span class="fps-value-container">
+          <span id="fps-value" class="fps-value">---</span>
+          <span class="fps-label">FPS</span>
+        </span>
+      </div>
+      <span id="project-path"></span>
+    </div>
+  </div>
+
+  <script src="/js/util/canvas2d.js"></script>
+  <script src="/js/runtime/microvm.js"></script>
+  <script src="/js/runtime/random.js"></script>
+  <script src="/js/runtime/timemachine.js"></script>
+  <script src="/js/runtime/msimage.js"></script>
+  <script src="/js/runtime/sprite.js"></script>
+  <script src="/js/runtime/map.js"></script>
+  <script src="/js/runtime/keyboard.js"></script>
+  <script src="/js/runtime/gamepad.js"></script>
+  <script src="/js/runtime/audio/audio.js"></script>
+  <script src="/js/runtime/audio/sound.js"></script>
+  <script src="/js/runtime/audio/music.js"></script>
+  <script src="/js/runtime/audio/beeper.js"></script>
+  <script src="/js/runtime/assetmanager.js"></script>
+  <script src="/js/runtime/screen.js"></script>
+  <script src="/js/runtime/storage.js"></script>
+  <script src="/js/runtime/system.js"></script>
+  <script src="/js/runtime/watcher.js"></script>
+  <script src="/js/runtime/player.js"></script>
+  <script src="/js/runtime/runtime.js"></script>
+  <script src="/js/languages/microscript/v2/token.js"></script>
+  <script src="/js/languages/microscript/v2/tokenizer.js"></script>
+  <script src="/js/languages/microscript/v2/program.js"></script>
+  <script src="/js/languages/microscript/v2/routine.js"></script>
+  <script src="/js/languages/microscript/v2/processor.js"></script>
+  <script src="/js/languages/microscript/v2/parser.js"></script>
+  <script src="/js/languages/microscript/v2/runner.js"></script>
+  <script src="/js/languages/microscript/v2/compiler.js"></script>
+  <script>
+    async function loadTheme() {
+      try {
+        const res = await fetch('/theme.json');
+        const theme = await res.json();
+        const root = document.documentElement;
+        Object.entries(theme.colors).forEach(([key, value]) => {
+          root.style.setProperty(`--color-${key}`, value);
+        });
+      } catch (err) {
+        console.error('Failed to load theme:', err);
+      }
+    }
+
+    const pathParts = window.location.pathname.split('/');
+    const project = pathParts[pathParts.length - 1] || pathParts[pathParts.length - 2];
+
+    async function loadProjectPath() {
+      try {
+        const res = await fetch('/api/project/' + project + '/path');
+        if (res.ok) {
+          const data = await res.json();
+          let msPath = data.path ? data.path + '/ms' : 'unknown';
+          msPath = msPath.replace(/^\/Users\/[^\/]+/, '~');
+          document.getElementById('project-path').textContent = msPath;
+        } else {
+          document.getElementById('project-path').textContent = 'unknown';
+        }
+      } catch (e) {
+        document.getElementById('project-path').textContent = 'unknown';
+      }
+    }
+    loadProjectPath();
+
+    let ws = null;
+    let runtime = null;
+    let terminalLines = document.getElementById('terminal-lines');
+    let terminalView = document.getElementById('terminal-view');
+
+    function printToTerminal(text, className = 'output') {
+      const div = document.createElement('div');
+      div.className = className;
+
+      const escaped = escapeHtml(text).replace(
+        /&lt;i class=&quot;fas fa-([^&]+)&quot;&gt;&lt;\/i&gt;/g,
+        '<i class="fas fa-$1"></i>'
+      );
+      div.innerHTML = escaped;
+      terminalLines.appendChild(div);
+      terminalView.scrollTop = terminalView.scrollHeight;
+
+      while (terminalLines.children.length > 10000) {
+        terminalLines.removeChild(terminalLines.firstChild);
+      }
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function copyTerminal() {
+      const lines = terminalLines.querySelectorAll('div');
+      const text = Array.from(lines)
+        .map(el => el.textContent)
+        .filter(t => t !== 'microScript 2.0')
+        .join('\n');
+      if (text.length > 0) {
+        navigator.clipboard.writeText(text).then(() => {
+          showTerminalNotification('Copied!');
+        });
+      }
+    }
+
+    function clearTerminal() {
+      terminalLines.innerHTML = '<div class="output">microScript 2.0</div>';
+    }
+
+    function showTerminalNotification(message) {
+      const notification = document.getElementById('terminal-notification');
+      notification.textContent = message;
+      notification.classList.add('show');
+      setTimeout(() => {
+        notification.classList.remove('show');
+      }, 1500);
+    }
+
+    function setupConsoleInterceptor() {
+      const original = {
+        log: console.log,
+        error: console.error,
+        warn: console.warn,
+        info: console.info,
+        trace: console.trace,
+        table: console.table,
+        time: console.time,
+        timeEnd: console.timeEnd,
+        timeLog: console.timeLog
+      };
+
+      const timers = {};
+
+      function formatMessage(args) {
+        return args.map(arg => {
+          if (typeof arg === 'object' && arg !== null) {
+            try { return JSON.stringify(arg, null, 2); }
+            catch (e) { return String(arg); }
+          }
+          return String(arg);
+        }).join(' ');
+      }
+
+      function formatTable(data, maxRows = 50) {
+        if (!Array.isArray(data) || data.length === 0) {
+          return formatMessage([data]);
+        }
+
+        const rows = data.slice(0, maxRows);
+        const keys = Object.keys(rows[0]);
+
+        const colWidths = {};
+        keys.forEach(key => {
+          colWidths[key] = Math.max(
+            key.length,
+            ...rows.map(row => String(row[key] || '').length)
+          );
+        });
+
+        const separator = '├' + keys.map(k => '─'.repeat(colWidths[k] + 2)).join('┼') + '┤';
+        const headerLine = '│ ' + keys.map(k => String(k).padEnd(colWidths[k])).join(' │ ') + ' │';
+
+        const bodyLines = rows.map(row => {
+          return '│ ' + keys.map(k => String(row[k] || '').padEnd(colWidths[k])).join(' │ ') + ' │';
+        });
+
+        const topBorder = '┌' + keys.map(k => '─'.repeat(colWidths[k] + 2)).join('┬') + '┐';
+        const bottomBorder = '└' + keys.map(k => '─'.repeat(colWidths[k] + 2)).join('┴') + '┘';
+
+        let result = topBorder + '\n' + headerLine + '\n' + separator + '\n';
+        result += bodyLines.join('\n') + '\n';
+        result += bottomBorder;
+
+        if (data.length > maxRows) {
+          result += '\n... and ' + (data.length - maxRows) + ' more rows';
+        }
+
+        return result;
+      }
+
+      function formatStackTrace() {
+        const stack = new Error().stack;
+        if (!stack) return '';
+
+        const lines = stack.split('\n').slice(3);
+        const filtered = lines
+          .map(line => line.trim().replace(/^at /, ''))
+          .filter(line => line && !line.includes('microRunner'))
+          .slice(0, 10);
+
+        if (filtered.length === 0) return '';
+        return '\n' + filtered.map(l => '    at ' + l).join('\n');
+      }
+
+      console.log = (...args) => {
+        original.log.apply(console, args);
+        printToTerminal('<i class="fas fa-code"></i> ' + formatMessage(args), 'console-log');
+      };
+
+      console.warn = (...args) => {
+        original.warn.apply(console, args);
+        printToTerminal('<i class="fas fa-triangle-exclamation"></i> ' + formatMessage(args), 'console-warn');
+      };
+
+      console.error = (...args) => {
+        original.error.apply(console, args);
+        printToTerminal('<i class="fas fa-circle-xmark"></i> ' + formatMessage(args), 'console-error');
+      };
+
+      console.info = (...args) => {
+        original.info.apply(console, args);
+        printToTerminal('<i class="fas fa-circle-info"></i> ' + formatMessage(args), 'console-info');
+      };
+
+      console.trace = (...args) => {
+        original.trace.apply(console, args);
+        const prefix = args.length > 0 ? formatMessage(args) + '\n' : '';
+        const trace = formatStackTrace();
+        const content = '<i class="fas fa-route"></i> ' + escapeHtml(prefix) + '<div class="stack-trace">' + escapeHtml(trace) + '</div>';
+        printToTerminal(content, 'console-trace');
+      };
+
+      console.table = (data) => {
+        original.table.apply(console, [data]);
+        let formatted;
+        if (Array.isArray(data) && data.length > 0) {
+          formatted = formatTable(data, 50);
+        } else {
+          formatted = formatMessage([data]);
+        }
+        const content = '<i class="fas fa-table"></i>\n<div class="table-output">' + escapeHtml(formatted) + '</div>';
+        printToTerminal(content, 'console-table');
+      };
+
+      console.time = (label) => {
+        original.time.apply(console, [label]);
+        timers[label] = Date.now();
+      };
+
+      console.timeEnd = (label) => {
+        if (timers[label] !== undefined) {
+          const ms = Date.now() - timers[label];
+          original.timeEnd.apply(console, [label]);
+          delete timers[label];
+          printToTerminal('<i class="fas fa-stopwatch"></i> ' + label + ': ' + ms.toFixed(2) + 'ms', 'console-time');
+        } else {
+          printToTerminal('<i class="fas fa-stopwatch"></i> ' + label + ': timer not started', 'console-time');
+        }
+      };
+
+      console.timeLog = (label) => {
+        original.timeLog.apply(console, [label]);
+        if (timers[label] !== undefined) {
+          const ms = Date.now() - timers[label];
+          printToTerminal('<i class="fas fa-clock"></i> ' + label + ': ' + ms.toFixed(2) + 'ms', 'console-time');
+        } else {
+          printToTerminal('<i class="fas fa-clock"></i> ' + label + ': timer not started', 'console-time');
+        }
+      };
+    }
+
+    function setupErrorHandlers() {
+      window.onerror = function(msg, url, line, col, error) {
+        const location = url ? `${url.split('/').pop()}:${line}` : 'unknown';
+        printToTerminal(`<i class="fas fa-bug"></i> JS Error: ${msg} (${location})`, 'error');
+        return true;
+      };
+
+      window.onunhandledrejection = function(event) {
+        const reason = event.reason || 'Unknown error';
+        let errorMsg = String(reason);
+        if (reason && typeof reason === 'object' && reason.message) {
+          errorMsg = reason.message;
+        }
+        printToTerminal(`<i class="fas fa-bug"></i> Promise Error: ${errorMsg}`, 'error');
+      };
+    }
+
+    document.getElementById('btn-terminal-copy').addEventListener('click', copyTerminal);
+    document.getElementById('btn-terminal-clear').addEventListener('click', clearTerminal);
+
+    function connectWebSocket() {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      ws = new WebSocket(`${protocol}//${window.location.host}/ws?project=${project}`);
+
+      ws.onopen = () => {
+        document.getElementById('connection-status').textContent = '● Connected';
+        document.getElementById('connection-status').className = 'connected';
+      };
+
+      ws.onclose = () => {
+        document.getElementById('connection-status').textContent = '● Disconnected';
+        document.getElementById('connection-status').className = 'disconnected';
+        setTimeout(connectWebSocket, 2000);
+      };
+
+      ws.onerror = () => {
+        document.getElementById('connection-status').textContent = '● Connection error';
+        document.getElementById('connection-status').className = 'disconnected';
+        printToTerminal('<i class="fas fa-plug"></i> WebSocket connection error', 'error');
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+          handleMessage(msg);
+        } catch (e) {
+          console.error('Failed to parse WebSocket message:', e);
+        }
+      };
+    }
+
+    function updateControlUI() {
+      if (!runtime) return;
+      const isPaused = runtime.stopped;
+      document.getElementById('btn-play').style.display = isPaused ? 'flex' : 'none';
+      document.getElementById('btn-pause').style.display = isPaused ? 'none' : 'flex';
+      document.getElementById('btn-step').style.display = isPaused ? 'flex' : 'none';
+      const status = document.getElementById('execution-status');
+      status.textContent = isPaused ? 'PAUSED' : 'RUNNING';
+      status.className = 'status-indicator ' + (isPaused ? 'status-paused' : 'status-running');
+    }
+
+    let fpsDisplayVisible = false;
+    let lastFpsUpdate = 0;
+    const FPS_UPDATE_INTERVAL = 1000; // ms
+    const fpsIcon = document.getElementById('fps-icon');
+    const fpsValue = document.getElementById('fps-value');
+
+    fpsIcon.addEventListener('click', () => {
+      fpsDisplayVisible = !fpsDisplayVisible;
+      fpsIcon.classList.toggle('active', fpsDisplayVisible);
+
+      if (fpsDisplayVisible) {
+        lastFpsUpdate = 0;
+        requestAnimationFrame(updateFPSDisplay);
+      } else {
+        fpsValue.textContent = '---';
+      }
+
+      if (!fpsDisplayVisible) {
+        fpsIcon.classList.add('turning-off');
+      }
+    });
+
+    fpsIcon.addEventListener('mouseleave', () => {
+      fpsIcon.classList.remove('turning-off');
+    });
+
+    function updateFPSDisplay() {
+      if (!fpsDisplayVisible) {
+        fpsValue.textContent = '---';
+        return;
+      }
+
+      const now = performance.now();
+
+      if (now - lastFpsUpdate >= FPS_UPDATE_INTERVAL) {
+        lastFpsUpdate = now;
+
+        if (runtime && runtime.vm && runtime.vm.context && runtime.vm.context.global) {
+          const fps = runtime.vm.context.global.system.fps;
+          fpsValue.textContent = fps ? Math.round(fps) : '---';
+        } else {
+          fpsValue.textContent = '---';
+        }
+      }
+
+      if (fpsDisplayVisible) {
+        requestAnimationFrame(updateFPSDisplay);
+      }
+    }
+
+    document.getElementById('btn-play').addEventListener('click', () => {
+      if (runtime) {
+        runtime.resume();
+        updateControlUI();
+        printToTerminal('<i class="fas fa-play"></i> Play', 'system');
+      }
+    });
+
+    document.getElementById('btn-pause').addEventListener('click', () => {
+      if (runtime) {
+        printToTerminal('<i class="fas fa-pause"></i> Pause', 'system');
+        runtime.stop();
+        updateControlUI();
+      }
+    });
+
+    document.getElementById('btn-step').addEventListener('click', () => {
+      if (runtime && runtime.stopped) {
+        runtime.stepForward();
+        printToTerminal('<i class="fas fa-step-forward"></i> Step', 'system');
+      }
+    });
+
+    document.getElementById('btn-restart').addEventListener('click', () => {
+      if (runtime) {
+        clearTerminal();
+        printToTerminal('<i class="fas fa-redo"></i> Restart', 'system');
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: 'restart' }));
+        }
+        runtime.stop();
+        initGame();
+      }
+    });
+
+    const terminalPane = document.querySelector('.terminal-pane');
+    const toggleTerminalBtn = document.getElementById('btn-toggle-terminal');
+    const terminalTab = document.getElementById('terminal-tab');
+    const btnTerminalPosition = document.getElementById('btn-terminal-position');
+    const btnTerminalCollapse = document.getElementById('btn-terminal-collapse');
+    const btnTerminalExpand = document.getElementById('btn-terminal-expand');
+    let terminalHeightState = 0;
+
+    function updateTerminalButtons() {
+      const isHidden = terminalPane.classList.contains('hidden');
+      toggleTerminalBtn.style.display = isHidden ? 'none' : 'flex';
+      terminalTab.style.display = isHidden ? 'flex' : 'none';
+    }
+
+    function toggleTerminal() {
+      terminalPane.classList.toggle('hidden');
+      const icon = toggleTerminalBtn.querySelector('i');
+      const gameWrapper = document.querySelector('.game-wrapper');
+
+      if (terminalPane.classList.contains('hidden')) {
+        icon.className = 'fas fa-eye';
+        if (window.gameAspect === 'free') {
+          gameWrapper.classList.add('full-width');
+          setTimeout(() => {
+            if (runtime && runtime.screen) {
+              runtime.screen.resize();
+            }
+          }, 50);
+        }
+      } else {
+        icon.className = 'fas fa-eye-slash';
+        gameWrapper.classList.remove('full-width');
+        setTimeout(() => {
+          if (runtime && runtime.screen) {
+            runtime.screen.resize();
+          }
+        }, 50);
+      }
+      updateTerminalButtons();
+    }
+
+    toggleTerminalBtn.addEventListener('click', toggleTerminal);
+    terminalTab.addEventListener('click', toggleTerminal);
+    updateTerminalButtons();
+
+    function updateTerminalHeightButtons() {
+      const isBottom = terminalPane.classList.contains('bottom');
+
+      if (!isBottom) {
+        btnTerminalCollapse.style.display = 'none';
+        btnTerminalExpand.style.display = 'none';
+        return;
+      }
+
+      if (terminalHeightState === 0) {
+        btnTerminalCollapse.style.display = 'flex';
+        btnTerminalExpand.style.display = 'none';
+        btnTerminalCollapse.querySelector('i').className = 'fas fa-chevron-down';
+        btnTerminalCollapse.title = 'Collapse to 250px';
+      } else if (terminalHeightState === 1) {
+        btnTerminalCollapse.style.display = 'flex';
+        btnTerminalExpand.style.display = 'flex';
+        btnTerminalCollapse.querySelector('i').className = 'fas fa-chevron-down';
+        btnTerminalCollapse.title = 'Collapse to 150px';
+        btnTerminalExpand.querySelector('i').className = 'fas fa-chevron-up';
+        btnTerminalExpand.title = 'Expand to 350px';
+      } else if (terminalHeightState === 2) {
+        btnTerminalCollapse.style.display = 'none';
+        btnTerminalExpand.style.display = 'flex';
+        btnTerminalExpand.querySelector('i').className = 'fas fa-chevron-up';
+        btnTerminalExpand.title = 'Expand to 250px';
+      }
+    }
+
+    function toggleTerminalCollapse() {
+      terminalHeightState++;
+      if (terminalHeightState > 2) {
+        terminalHeightState = 1;
+      }
+
+      terminalPane.classList.remove('collapsed', 'half');
+
+      if (terminalHeightState === 1) {
+        terminalPane.classList.add('half');
+      } else if (terminalHeightState === 2) {
+        terminalPane.classList.add('collapsed');
+      }
+
+      updateTerminalHeightButtons();
+
+      setTimeout(() => {
+        if (runtime && runtime.screen) {
+          runtime.screen.resize();
+        }
+      }, 50);
+    }
+
+    function toggleTerminalExpand() {
+      terminalHeightState--;
+      if (terminalHeightState < 0) {
+        terminalHeightState = 1;
+      }
+
+      terminalPane.classList.remove('collapsed', 'half');
+
+      if (terminalHeightState === 1) {
+        terminalPane.classList.add('half');
+      } else if (terminalHeightState === 2) {
+        terminalPane.classList.add('collapsed');
+      }
+
+      updateTerminalHeightButtons();
+
+      setTimeout(() => {
+        if (runtime && runtime.screen) {
+          runtime.screen.resize();
+        }
+      }, 50);
+    }
+
+    btnTerminalCollapse.addEventListener('click', toggleTerminalCollapse);
+    btnTerminalExpand.addEventListener('click', toggleTerminalExpand);
+
+    function toggleTerminalPosition() {
+      const mainContent = document.querySelector('.main-content');
+      const gameWrapper = document.querySelector('.game-wrapper');
+
+      mainContent.classList.toggle('bottom');
+      terminalPane.classList.toggle('bottom');
+      gameWrapper.classList.toggle('bottom');
+      terminalTab.classList.toggle('bottom');
+
+      const isBottom = terminalPane.classList.contains('bottom');
+
+      if (isBottom) {
+        btnTerminalPosition.querySelector('i').className = 'fas fa-arrow-right';
+        btnTerminalPosition.title = 'Move to Right';
+      } else {
+        btnTerminalPosition.querySelector('i').className = 'fas fa-chevron-down';
+        btnTerminalPosition.title = 'Move to Bottom';
+        terminalHeightState = 0;
+        terminalPane.classList.remove('collapsed', 'half');
+      }
+
+      updateTerminalHeightButtons();
+
+      setTimeout(() => {
+        if (runtime && runtime.screen) {
+          runtime.screen.resize();
+        }
+      }, 50);
+    }
+
+    btnTerminalPosition.addEventListener('click', toggleTerminalPosition);
+
+    function handleMessage(msg) {
+      switch (msg.type) {
+        case 'update':
+          if (runtime) {
+            runtime.updateSource(msg.file, msg.code);
+            printToTerminal('// ' + msg.file + '.ms updated', 'system');
+          }
+          break;
+        case 'log':
+          printToTerminal(msg.data, 'output');
+          break;
+        case 'error':
+          printToTerminal(msg.data, 'error');
+          break;
+      }
+    }
+
+    async function initGame() {
+      try {
+        const res = await fetch('/api/project/' + project);
+        const config = await res.json();
+
+        document.getElementById('project-name').textContent = config.name;
+        document.title = 'microRunner - ' + config.name;
+
+        const aspect = config.aspect || "free";
+        const orientation = config.orientation || "any";
+
+        const sources = {};
+        for (const src of config.files.sources) {
+          const fileRes = await fetch('/api/file/' + project + '/' + src.file);
+          const content = await fileRes.text();
+          const name = src.file.replace('.ms', '');
+          sources[name] = content;
+        }
+
+        const baseUrl = window.location.origin + window.location.pathname.replace(/\/[^\/]*$/, '/');
+
+        const resources = {
+          images: config.files.images || [],
+          maps: config.files.maps || [],
+          sounds: config.files.sounds || [],
+          music: config.files.music || [],
+          assets: config.files.assets || []
+        };
+
+        let compiledCount = 0;
+        const totalFiles = config.files.sources.length;
+
+        const playerListener = function(event) {
+          if (event.name === 'compile_success') {
+            compiledCount++;
+            if (compiledCount === totalFiles) {
+              printToTerminal('<i class="fas fa-check"></i> All ' + totalFiles + ' MS files compiled', 'system');
+            }
+          }
+        };
+
+        const logListener = {
+          log: (text) => {
+            if (text === null || text === undefined) {
+              printToTerminal('null', 'output');
+            } else if (typeof text === 'object') {
+              if (text.message) {
+                // Check if this is a warning from runtime
+                if (text.type === 'warning') {
+                  printToTerminal('⚠️ ' + text.message, 'warning');
+                } else if (text.file || text.line || text.column) {
+                  // Compiler warning with file info
+                  let msg = text.message;
+                  if (text.file) msg += `, in file "${text.file.replace('.ms', '')}"`;
+                  if (text.line) msg += ` at line ${text.line}`;
+                  if (text.column) msg += `, column ${text.column}`;
+                  printToTerminal('⚠️ ' + msg, 'warning');
+                } else {
+                  printToTerminal(text.message, 'output');
+                }
+              } else if (Object.keys(text).length === 0) {
+                printToTerminal('(empty object)', 'output');
+              } else {
+                try {
+                  printToTerminal(JSON.stringify(text, null, 2), 'output');
+                } catch (e) {
+                  printToTerminal('(circular reference)', 'output');
+                }
+              }
+            } else {
+              printToTerminal(String(text), 'output');
+            }
+            if (ws && ws.readyState === WebSocket.OPEN) {
+              ws.send(JSON.stringify({ type: 'log', data: String(text) }));
+            }
+          },
+          reportError: (err) => {
+            let msg;
+            if (err && typeof err === 'object') {
+              if (err.message) {
+                msg = err.message;
+              } else if (err.error) {
+                msg = String(err.error);
+              } else {
+                msg = 'Error: ' + JSON.stringify(err);
+              }
+            } else {
+              msg = String(err);
+            }
+            if (err.file) msg += ' at ' + err.file;
+            if (err.line) msg += ':' + err.line;
+            printToTerminal(msg, 'error');
+            if (ws && ws.readyState === WebSocket.OPEN) {
+              ws.send(JSON.stringify({ type: 'error', data: msg }));
+            }
+          },
+          reportWarning: (warn) => {
+            let msg;
+            if (warn && typeof warn === 'object') {
+              if (warn.message) {
+                msg = warn.message;
+              } else {
+                msg = 'Warning: ' + JSON.stringify(warn);
+              }
+            } else {
+              msg = String(warn);
+            }
+            if (warn.file) {
+              let file = warn.file.replace('.ms', '');
+              if (warn.line) {
+                msg += ` (${file}:${warn.line})`;
+              } else {
+                msg += ` (${file})`;
+              }
+            }
+            printToTerminal('⚠️ ' + msg, 'warning');
+          },
+          postMessage: (msg) => {
+            playerListener(msg);
+          }
+        };
+
+        runtime = new Runtime(baseUrl, sources, resources, logListener, document.getElementById('game-canvas'), {
+          aspect: aspect,
+          orientation: orientation,
+          projectName: project,
+          container: document.querySelector('.game-wrapper')
+        });
+
+        window.player = new Player(playerListener);
+        window.player.init(runtime);
+
+        if (runtime && runtime.vm && runtime.vm.context && runtime.vm.context.global) {
+          runtime.vm.context.global.jsAlert = function(msg) {
+            alert(msg);
+            return "alert shown";
+          };
+          runtime.vm.context.global.jsLog = function(msg) {
+            console.log("[JS] " + msg);
+            return "logged";
+          };
+          runtime.vm.context.global.jsCalculate = function(a, b) {
+            return a + b;
+          };
+          runtime.vm.context.global.jsGetTime = function() {
+            return Date.now();
+          };
+          runtime.vm.context.global.jsUppercase = function(str) {
+            return String(str).toUpperCase();
+          };
+          runtime.vm.context.global.jsFormatDate = function(timestamp) {
+            const d = new Date(timestamp);
+            return d.toISOString().split('T')[0];
+          };
+        }
+
+        window.gameAspect = aspect;
+
+        await new Promise((resolve) => {
+          const checkReady = () => {
+            let allReady = true;
+            if (runtime.sprites) {
+              for (const key in runtime.sprites) {
+                if (!runtime.sprites[key].ready) {
+                  allReady = false;
+                  break;
+                }
+              }
+            }
+            if (allReady && runtime.screen && !runtime.screen.isFontReady()) {
+              allReady = false;
+            }
+            if (allReady) {
+              resolve();
+            } else {
+              setTimeout(checkReady, 10);
+            }
+          };
+          checkReady();
+        });
+
+        runtime.start();
+        updateControlUI();
+
+
+      } catch (err) {
+        console.error('Failed to initialize game:', err);
+        printToTerminal('Error: ' + err.message, 'error');
+      }
+    }
+
+    function initTerminalPosition() {
+      const screenWidth = window.screen.width;
+      const windowWidth = window.innerWidth;
+      const isNarrow = windowWidth < screenWidth / 2;
+
+      const mainContent = document.querySelector('.main-content');
+      const gameWrapper = document.querySelector('.game-wrapper');
+
+      if (isNarrow) {
+        mainContent.classList.add('bottom');
+        terminalPane.classList.add('bottom');
+        gameWrapper.classList.add('bottom');
+        terminalTab.classList.add('bottom');
+
+        btnTerminalPosition.querySelector('i').className = 'fas fa-arrow-right';
+        btnTerminalPosition.title = 'Move to Right';
+      }
+
+      updateTerminalHeightButtons();
+    }
+
+    async function initThemeAndGame() {
+      await loadTheme();
+      setupConsoleInterceptor();
+      setupErrorHandlers();
+      connectWebSocket();
+      initTerminalPosition();
+      initGame();
+    }
+    initThemeAndGame();
+  </script>
+</body>
+
+</html>
